@@ -1,0 +1,7 @@
+{
+  "name": "Enso - Poetics Studio",
+  "description": "A minimalist project management tool inspired by Japanese design philosophy. It removes the noise of traditional PM software to focus on clarity, essence, and flow.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
