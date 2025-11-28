@@ -30,7 +30,7 @@ const AuthCallback: React.FC = () => {
             // Existing user, redirect to app
             setStatus('success');
             setTimeout(() => {
-              window.location.href = '/experiments/enso/';
+              window.location.href = '/';
             }, 2000);
           } else {
             // New user, needs team setup
@@ -61,7 +61,7 @@ const AuthCallback: React.FC = () => {
         await signupWithOAuth(name, data.user.email || '');
         setStatus('success');
         setTimeout(() => {
-          window.location.href = '/experiments/enso/';
+          window.location.href = '/';
         }, 2000);
       }
     } catch (err: any) {
@@ -100,7 +100,7 @@ const AuthCallback: React.FC = () => {
               <p className="text-gray-600 dark:text-gray-400">Authentication failed</p>
               <p className="text-xs text-vermilion">{error}</p>
               <button
-                onClick={() => window.location.href = '/experiments/enso/'}
+                onClick={() => window.location.href = '/'}
                 className="mt-4 text-sm text-sumi dark:text-paper hover:text-vermilion transition-colors"
               >
                 Return to login

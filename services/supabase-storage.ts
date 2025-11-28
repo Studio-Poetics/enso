@@ -82,7 +82,7 @@ export const authService = {
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${window.location.origin}/experiments/enso/auth/callback`
+        redirectTo: `${window.location.origin}/auth/callback`
       }
     });
 
@@ -237,7 +237,7 @@ export const authService = {
   // Password Reset
   async resetPassword(email: string): Promise<void> {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/experiments/enso/auth/reset-password`
+      redirectTo: `${window.location.origin}/auth/reset-password`
     });
 
     if (error) throw new Error("Failed to send reset email. Please check your email address.");

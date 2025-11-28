@@ -16,7 +16,7 @@ const ResetPassword: React.FC = () => {
     const checkSession = async () => {
       const { data, error } = await supabase.auth.getSession();
       if (!data.session || error) {
-        window.location.href = '/experiments/enso/';
+        window.location.href = '/';
       }
     };
 
@@ -45,7 +45,7 @@ const ResetPassword: React.FC = () => {
 
       setIsSuccess(true);
       setTimeout(() => {
-        window.location.href = '/experiments/enso/';
+        window.location.href = '/';
       }, 3000);
 
     } catch (err: any) {
@@ -150,7 +150,7 @@ const ResetPassword: React.FC = () => {
 
           <div className="mt-8 text-center">
             <button
-              onClick={() => window.location.href = '/experiments/enso/'}
+              onClick={() => window.location.href = '/'}
               className="text-xs text-gray-500 dark:text-gray-400 hover:text-sumi dark:hover:text-paper transition-colors"
             >
               Back to Login

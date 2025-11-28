@@ -1,0 +1,37 @@
+# Alternative: Deploy via Vercel CLI
+
+# Install Vercel CLI
+npm i -g vercel
+
+# Login to Vercel
+vercel login
+
+# Deploy (from project directory)
+vercel --prod
+
+# Follow prompts:
+# - Set up and deploy "~/path/to/enso"? [Y/n] y
+# - Which scope? Studio-Poetics (or your scope)
+# - Link to existing project? [y/N] n
+# - What's your project's name? enso
+# - In which directory is your code located? ./
+# - Want to modify settings? [y/N] y
+#   - Build Command: npm run build
+#   - Output Directory: dist
+#   - Development Command: npm run dev
+
+# Set environment variables
+vercel env add VITE_USE_SUPABASE
+# Enter: true
+
+vercel env add VITE_SUPABASE_URL
+# Enter: https://your-project.supabase.co
+
+vercel env add VITE_SUPABASE_ANON_KEY
+# Enter: your-supabase-anon-key
+
+vercel env add VITE_GEMINI_API_KEY
+# Enter: your-gemini-api-key
+
+# Redeploy with environment variables
+vercel --prod
