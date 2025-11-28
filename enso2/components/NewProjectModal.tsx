@@ -1,0 +1,182 @@
+import React, { useState } from 'react';
+import { Project, ProjectStatus, ProjectLayout } from '../types';
+import { generateProjectEssence } from '../services/gemini';
+import { X, Sparkles, ArrowRight, LayoutList, Kanban as KanbanIcon } from 'lucide-react';
+
+interface NewProjectModalProps {
+  onSave: (project: Omit<Project, 'teamId' | 'ownerId' | 'collaborators'>) => void;
+  onClose: () => void;
+}
+
+const NewProjectModal: React.FC<NewProjectModalProps> = ({ onSave, onClose }) => {
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [title, setTitle] = useState('');
+  const [client, setClient] = useState('');
+  const [notes, setNotes] = useState('');
+  const [essence, setEssence] = useState('');
+  const [layout, setLayout] = useState<ProjectLayout>('manuscript');
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const handleGenerateEssence = async () => {
+    if (!notes.trim()) return;
+    setIsGenerating(true);
+    const result = await generateProjectEssence(notes);
+    setEssence(result);
+    setIsGenerating(false);
+    setStep(2);
+  };
+
+  const handleFinalSave = () => {
+    const newProject: Omit<Project, 'teamId' | 'ownerId' | 'collaborators'> = {
+      id: Math.random().toString(36).substr(2, 9),
+      title,
+      client,
+      status: ProjectStatus.IDEA,
+      essence,
+      layout,
+      tasks: [],
+      boardItems: [],
+      createdAt: Date.now(),
+    };
+    onSave(newProject);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-paper/90 dark:bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-paper dark:bg-neutral-900 w-full max-w-2xl border border-gray-200 dark:border-gray-800 shadow-xl p-12 relative animate-fade-in-up">
+        <button onClick={onClose} className="absolute top-8 right-8 text-gray-400 hover:text-sumi dark:hover:text-paper">
+          <X size={24} />
+        </button>
+
+        {step === 1 && (
+          <div className="space-y-8">
+            <h2 className="text-3xl font-serif text-sumi dark:text-paper">Inception</h2>
+            
+            <div className="grid grid-cols-2 gap-8">
+              <div className="space-y-2">
+                <label className="text-xs uppercase tracking-widest text-gray-500 dark:text-gray-400 font-medium">Project Name</label>
+                <input 
+                  autoFocus
+                  className="w-full border-b border-gray-200 dark:border-gray-700 py-2 font-sans text-xl focus:outline-none focus:border-sumi dark:focus:border-paper transition-colors bg-transparent text-sumi dark:text-paper"
+                  value={title}
+                  onChange={e => setTitle(e.target.value)}
+                  placeholder="e.g. Osaka Branding"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs uppercase tracking-widest text-gray-500 dark:text-gray-400 font-medium">Client</label>
+                <input 
+                  className="w-full border-b border-gray-200 dark:border-gray-700 py-2 font-sans text-xl focus:outline-none focus:border-sumi dark:focus:border-paper transition-colors bg-transparent text-sumi dark:text-paper"
+                  value={client}
+                  onChange={e => setClient(e.target.value)}
+                  placeholder="e.g. Suntory"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs uppercase tracking-widest text-gray-500 dark:text-gray-400 font-medium">Rough Notes</label>
+              <textarea 
+                className="w-full border border-gray-200 dark:border-gray-700 p-4 font-mono text-sm focus:outline-none focus:border-sumi dark:focus:border-paper transition-colors bg-gray-50/50 dark:bg-black/30 h-32 resize-none text-sumi dark:text-paper"
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                placeholder="Dump your raw thoughts here. The AI will distill them..."
+              />
+            </div>
+
+            <div className="flex justify-end pt-4">
+              <button 
+                onClick={handleGenerateEssence}
+                disabled={!title || !client || !notes || isGenerating}
+                className="bg-sumi dark:bg-paper text-white dark:text-sumi px-8 py-3 flex items-center gap-3 disabled:opacity-50 hover:bg-vermilion dark:hover:bg-vermilion dark:hover:text-white transition-colors duration-300 shadow-lg"
+              >
+                {isGenerating ? (
+                  <span>Distilling...</span>
+                ) : (
+                  <>
+                    <span className="uppercase tracking-widest text-sm font-medium">Distill Essence</span>
+                    <Sparkles size={16} />
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {step === 2 && (
+          <div className="space-y-8">
+             <h2 className="text-3xl font-serif text-sumi dark:text-paper">Refine the Essence</h2>
+             <p className="text-gray-600 dark:text-gray-400">We have distilled your notes into a singular direction.</p>
+             
+             <div className="bg-white/50 dark:bg-black/30 p-8 border-l-4 border-vermilion">
+               <textarea 
+                 value={essence}
+                 onChange={(e) => setEssence(e.target.value)}
+                 className="w-full bg-transparent border-none outline-none font-serif text-xl leading-relaxed text-sumi dark:text-paper h-32 resize-none italic"
+               />
+             </div>
+
+             <div className="flex justify-between items-center pt-8">
+               <button onClick={() => setStep(1)} className="text-gray-500 dark:text-gray-400 hover:text-sumi dark:hover:text-paper text-sm uppercase tracking-wider font-medium">Back</button>
+               <button 
+                onClick={() => setStep(3)}
+                className="bg-sumi dark:bg-paper text-white dark:text-sumi px-8 py-3 flex items-center gap-3 hover:bg-vermilion dark:hover:bg-vermilion dark:hover:text-white transition-colors duration-300 shadow-lg"
+              >
+                <span className="uppercase tracking-widest text-sm font-medium">Next: Structure</span>
+                <ArrowRight size={16} />
+              </button>
+             </div>
+          </div>
+        )}
+
+        {step === 3 && (
+          <div className="space-y-8">
+             <h2 className="text-3xl font-serif text-sumi dark:text-paper">Choose Structure</h2>
+             <p className="text-gray-600 dark:text-gray-400">How do you wish to visualize this journey?</p>
+             
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <button 
+                  onClick={() => setLayout('manuscript')}
+                  className={`p-6 border text-left flex flex-col gap-4 transition-all duration-300 ${layout === 'manuscript' ? 'border-sumi dark:border-paper bg-white dark:bg-neutral-800' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 bg-transparent'}`}
+                >
+                  <div className="flex items-center gap-3 text-sumi dark:text-paper">
+                    <LayoutList size={24} />
+                    <span className="font-serif text-lg">Manuscript</span>
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                    A linear, intuitive scroll. Treats the project like a story or a document. Best for flow and narrative.
+                  </p>
+                </button>
+
+                <button 
+                  onClick={() => setLayout('kanban')}
+                  className={`p-6 border text-left flex flex-col gap-4 transition-all duration-300 ${layout === 'kanban' ? 'border-sumi dark:border-paper bg-white dark:bg-neutral-800' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 bg-transparent'}`}
+                >
+                  <div className="flex items-center gap-3 text-sumi dark:text-paper">
+                    <KanbanIcon size={24} />
+                    <span className="font-serif text-lg">Kanban</span>
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                    A traditional board with columns. Moves tasks across stages. Best for complex, multi-stage logistics.
+                  </p>
+                </button>
+             </div>
+
+             <div className="flex justify-between items-center pt-8">
+               <button onClick={() => setStep(2)} className="text-gray-500 dark:text-gray-400 hover:text-sumi dark:hover:text-paper text-sm uppercase tracking-wider font-medium">Back</button>
+               <button 
+                onClick={handleFinalSave}
+                className="bg-sumi dark:bg-paper text-white dark:text-sumi px-8 py-3 flex items-center gap-3 hover:bg-vermilion dark:hover:bg-vermilion dark:hover:text-white transition-colors duration-300 shadow-lg"
+              >
+                <span className="uppercase tracking-widest text-sm font-medium">Begin Project</span>
+                <ArrowRight size={16} />
+              </button>
+             </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default NewProjectModal;

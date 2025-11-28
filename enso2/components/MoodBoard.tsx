@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { BoardItem } from '../types';
 import { Plus, Image as ImageIcon, Type, Link as LinkIcon, Mic, Square, Trash2, ExternalLink, Play, Pause, ArrowLeft } from 'lucide-react';
@@ -13,7 +14,6 @@ interface MoodBoardProps {
 
 const MoodBoard: React.FC<MoodBoardProps> = ({ items, onUpdateItems, title, subtitle, onBack }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const addItem = (item: BoardItem) => {
@@ -32,7 +32,6 @@ const MoodBoard: React.FC<MoodBoardProps> = ({ items, onUpdateItems, title, subt
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setIsUploading(true);
       try {
         const processedContent = await processFile(file);
         addItem({
@@ -44,9 +43,7 @@ const MoodBoard: React.FC<MoodBoardProps> = ({ items, onUpdateItems, title, subt
         });
       } catch (err) {
         console.error("File processing failed", err);
-        alert("Could not process file. Please check your Google Drive permissions or try a smaller file.");
-      } finally {
-        setIsUploading(false);
+        alert("Could not process file.");
       }
     }
   };
@@ -77,7 +74,7 @@ const MoodBoard: React.FC<MoodBoardProps> = ({ items, onUpdateItems, title, subt
 
   return (
     <div className="w-full h-full bg-paper dark:bg-sumi p-8 overflow-y-auto custom-scrollbar relative transition-colors duration-300">
-
+      
       {/* Header for Task Context */}
       {(title || onBack) && (
         <div className="flex items-center gap-4 mb-8 pb-4 border-b border-gray-200 dark:border-gray-800">
@@ -97,17 +94,8 @@ const MoodBoard: React.FC<MoodBoardProps> = ({ items, onUpdateItems, title, subt
       <div className="fixed bottom-12 right-12 z-40 flex flex-col items-end gap-4">
         {isMenuOpen && (
           <div className="flex flex-col gap-3 mb-2 animate-fade-in-up">
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading}
-              className={`bg-white dark:bg-neutral-800 text-sumi dark:text-paper p-3 rounded-full shadow-lg hover:bg-vermilion hover:text-white dark:hover:bg-vermilion dark:hover:text-white transition-colors tooltip ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
-              title={isUploading ? "Uploading..." : "Image"}
-            >
-              {isUploading ? (
-                <div className="animate-spin w-5 h-5 border-2 border-current border-t-transparent rounded-full" />
-              ) : (
-                <ImageIcon size={20} />
-              )}
+            <button onClick={() => fileInputRef.current?.click()} className="bg-white dark:bg-neutral-800 text-sumi dark:text-paper p-3 rounded-full shadow-lg hover:bg-vermilion hover:text-white dark:hover:bg-vermilion dark:hover:text-white transition-colors tooltip" title="Image">
+              <ImageIcon size={20} />
             </button>
             <button onClick={handleAddText} className="bg-white dark:bg-neutral-800 text-sumi dark:text-paper p-3 rounded-full shadow-lg hover:bg-vermilion hover:text-white dark:hover:bg-vermilion dark:hover:text-white transition-colors tooltip" title="Note">
               <Type size={20} />
@@ -115,20 +103,17 @@ const MoodBoard: React.FC<MoodBoardProps> = ({ items, onUpdateItems, title, subt
             <button onClick={handleAddLink} className="bg-white dark:bg-neutral-800 text-sumi dark:text-paper p-3 rounded-full shadow-lg hover:bg-vermilion hover:text-white dark:hover:bg-vermilion dark:hover:text-white transition-colors tooltip" title="Link">
               <LinkIcon size={20} />
             </button>
-            <AudioRecorder
-              onRecord={(blobUrl) => addItem({
-                id: Date.now().toString(),
-                type: 'audio',
-                content: blobUrl,
-                marginalia: '',
-                createdAt: Date.now()
-              })}
-              disabled={isUploading}
-            />
+            <AudioRecorder onRecord={(blobUrl) => addItem({
+               id: Date.now().toString(),
+               type: 'audio',
+               content: blobUrl,
+               marginalia: '',
+               createdAt: Date.now()
+            })} />
             <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileUpload} />
           </div>
         )}
-        <button
+        <button 
           onClick={() => setIsMenuOpen(!isMenuOpen)}
           className={`p-4 rounded-full shadow-2xl transition-all duration-300 ${isMenuOpen ? 'bg-vermilion rotate-45 text-white' : 'bg-sumi dark:bg-paper text-white dark:text-sumi hover:bg-vermilion dark:hover:bg-vermilion dark:hover:text-white'}`}
         >
@@ -150,11 +135,11 @@ const MoodBoard: React.FC<MoodBoardProps> = ({ items, onUpdateItems, title, subt
       <div className="columns-1 md:columns-2 lg:columns-3 gap-8 space-y-8 pb-32 max-w-7xl mx-auto">
         {items.map(item => (
           <div key={item.id} className="break-inside-avoid group relative animate-fade-in-up">
-
+            
             {/* Main Content Block */}
             <div className="bg-white dark:bg-neutral-800 border border-gray-200 dark:border-gray-700 shadow-sm transition-shadow hover:shadow-md p-4">
                {/* Delete Button */}
-               <button
+               <button 
                   onClick={() => deleteItem(item.id)}
                   className="absolute top-2 right-2 text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity z-10 p-2"
                >
@@ -166,7 +151,7 @@ const MoodBoard: React.FC<MoodBoardProps> = ({ items, onUpdateItems, title, subt
                )}
 
                {item.type === 'text' && (
-                 <textarea
+                 <textarea 
                    value={item.content}
                    onChange={(e) => updateItem(item.id, { content: e.target.value })}
                    placeholder="Write a thought..."
@@ -194,7 +179,7 @@ const MoodBoard: React.FC<MoodBoardProps> = ({ items, onUpdateItems, title, subt
 
             {/* Marginalia (Handwriting) */}
             <div className="mt-3 ml-2 relative pl-4 border-l border-gray-300/50 dark:border-gray-600/50">
-               <textarea
+               <textarea 
                   value={item.marginalia}
                   onChange={(e) => updateItem(item.id, { marginalia: e.target.value })}
                   placeholder="jot something down..."
@@ -217,22 +202,18 @@ const MoodBoard: React.FC<MoodBoardProps> = ({ items, onUpdateItems, title, subt
 
 // --- Sub Components ---
 
-const AudioRecorder: React.FC<{
-  onRecord: (blobUrl: string) => void;
-  disabled?: boolean;
-}> = ({ onRecord, disabled = false }) => {
+const AudioRecorder: React.FC<{ onRecord: (blobUrl: string) => void }> = ({ onRecord }) => {
   const [isRecording, setIsRecording] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
+      
       // Optimize options for speech to save space (32kbps)
       const options: MediaRecorderOptions = {
-        audioBitsPerSecond: MEDIA_CONFIG.AUDIO_BITRATE,
+        audioBitsPerSecond: MEDIA_CONFIG.AUDIO_BITRATE, 
         mimeType: 'audio/webm;codecs=opus'
       };
 
@@ -248,32 +229,11 @@ const AudioRecorder: React.FC<{
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
 
-      mediaRecorderRef.current.onstop = async () => {
-        setIsProcessing(true);
-        try {
-          const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-
-          // Check if we should upload to Google Drive
-          const fileSizeKB = blob.size / 1024;
-          if (fileSizeKB > MEDIA_CONFIG.DRIVE_THRESHOLD_KB && window.gapi) {
-            // Create a File object from the blob
-            const file = new File([blob], `audio_${Date.now()}.webm`, { type: 'audio/webm' });
-            try {
-              const processedContent = await processFile(file);
-              onRecord(processedContent);
-            } catch (error) {
-              console.warn('Google Drive upload failed, using blob URL:', error);
-              const url = URL.createObjectURL(blob);
-              onRecord(url);
-            }
-          } else {
-            const url = URL.createObjectURL(blob);
-            onRecord(url);
-          }
-        } finally {
-          setIsProcessing(false);
-          stream.getTracks().forEach(track => track.stop());
-        }
+      mediaRecorderRef.current.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        const url = URL.createObjectURL(blob);
+        onRecord(url);
+        stream.getTracks().forEach(track => track.stop());
       };
 
       mediaRecorderRef.current.start();
@@ -291,30 +251,13 @@ const AudioRecorder: React.FC<{
     }
   };
 
-  const isDisabled = disabled || isProcessing;
-
   return (
-    <button
+    <button 
       onClick={isRecording ? stopRecording : startRecording}
-      disabled={isDisabled}
-      className={`p-3 rounded-full shadow-lg transition-colors tooltip ${
-        isDisabled ? 'opacity-50 cursor-not-allowed bg-gray-300 dark:bg-gray-700' :
-        isRecording ? 'bg-vermilion text-white animate-pulse' :
-        'bg-white dark:bg-neutral-800 text-sumi dark:text-paper hover:bg-vermilion hover:text-white dark:hover:bg-vermilion dark:hover:text-white'
-      }`}
-      title={
-        isProcessing ? "Processing..." :
-        isRecording ? "Stop Recording" :
-        "Voice Note"
-      }
+      className={`p-3 rounded-full shadow-lg transition-colors tooltip ${isRecording ? 'bg-vermilion text-white animate-pulse' : 'bg-white dark:bg-neutral-800 text-sumi dark:text-paper hover:bg-vermilion hover:text-white dark:hover:bg-vermilion dark:hover:text-white'}`}
+      title={isRecording ? "Stop Recording" : "Voice Note"}
     >
-      {isProcessing ? (
-        <div className="animate-spin w-5 h-5 border-2 border-current border-t-transparent rounded-full" />
-      ) : isRecording ? (
-        <Square size={20} fill="currentColor" />
-      ) : (
-        <Mic size={20} />
-      )}
+      {isRecording ? <Square size={20} fill="currentColor" /> : <Mic size={20} />}
     </button>
   );
 };
@@ -335,13 +278,13 @@ const AudioPlayer: React.FC<{ src: string }> = ({ src }) => {
 
   return (
     <div className="flex items-center gap-4 py-2">
-      <audio
-        ref={audioRef}
-        src={src}
+      <audio 
+        ref={audioRef} 
+        src={src} 
         onEnded={() => setIsPlaying(false)}
-        className="hidden"
+        className="hidden" 
       />
-      <button
+      <button 
         onClick={togglePlay}
         className="w-10 h-10 rounded-full border border-gray-200 dark:border-gray-600 flex items-center justify-center text-sumi dark:text-paper hover:bg-sumi hover:text-white dark:hover:bg-paper dark:hover:text-sumi transition-colors"
       >
@@ -351,8 +294,8 @@ const AudioPlayer: React.FC<{ src: string }> = ({ src }) => {
          {/* Visual waveform placeholder */}
          <div className="w-full h-1 bg-gray-100 dark:bg-neutral-700 flex items-center justify-between gap-[2px]">
             {Array.from({ length: 20 }).map((_, i) => (
-              <div
-                key={i}
+              <div 
+                key={i} 
                 className={`w-full bg-gray-300 dark:bg-gray-600 rounded-full transition-all duration-300 ${isPlaying ? 'animate-pulse' : ''}`}
                 style={{ height: Math.max(20, Math.random() * 100) + '%' }}
               />
