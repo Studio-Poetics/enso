@@ -390,7 +390,10 @@ export const dbService = {
       .select()
       .single();
 
-    if (error) throw new Error("Failed to create project");
+    if (error) {
+      console.error("Project creation error:", error);
+      throw new Error(`Failed to create project: ${error.message}`);
+    }
 
     return mapProjectFromDb(data);
   },
