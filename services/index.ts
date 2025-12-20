@@ -19,8 +19,5 @@ export const dbService = USE_SUPABASE ? supabaseService.dbService : localStorage
 // Export configuration for debugging
 export const isUsingSupabase = USE_SUPABASE;
 
-// Log which service is being used
-console.log(`🔧 Enso Storage: Using ${USE_SUPABASE ? 'Supabase' : 'LocalStorage'} backend`);
-
 // Re-export types for convenience
 export type { User, Team, Project } from '../types';
