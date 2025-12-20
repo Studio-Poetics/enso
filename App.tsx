@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Project, ViewState } from './types';
 import ProjectList from './components/ProjectList';
 import ProjectDetail from './components/ProjectDetail';
@@ -8,8 +8,10 @@ import AuthCallback from './components/AuthCallback';
 import ResetPassword from './components/ResetPassword';
 import { useAuth } from './context/AuthContext';
 import { dbService } from './services';
-import { Loader, Moon, Sun } from 'lucide-react';
+import { Loader, Moon, Sun, Check, CloudUpload } from 'lucide-react';
 import { useTheme } from './context/ThemeContext';
+
+type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
 const App: React.FC = () => {
   const { user, team, isLoading: isAuthLoading } = useAuth();
@@ -25,6 +27,9 @@ const App: React.FC = () => {
   const [activeProject, setActiveProject] = useState<Project | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDataLoading, setIsDataLoading] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load Projects when User/Team changes
   useEffect(() => {
@@ -54,15 +59,35 @@ const App: React.FC = () => {
     setView('DASHBOARD');
   };
 
-  const handleUpdateProject = async (updated: Project) => {
+  const handleUpdateProject = useCallback(async (updated: Project) => {
     // Optimistic UI Update
     const updatedProjects = projects.map(p => p.id === updated.id ? updated : p);
     setProjects(updatedProjects);
     setActiveProject(updated);
-    
-    // Persist
-    await dbService.updateProject(updated);
-  };
+
+    // Clear existing timeout
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    // Show saving status immediately
+    setSaveStatus('saving');
+
+    // Debounced save (wait 1 second after last change)
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        await dbService.updateProject(updated);
+        setSaveStatus('saved');
+        // Reset to idle after 2 seconds
+        setTimeout(() => setSaveStatus('idle'), 2000);
+      } catch (error) {
+        console.error("Failed to save project:", error);
+        setSaveStatus('error');
+        // Reset to idle after 3 seconds
+        setTimeout(() => setSaveStatus('idle'), 3000);
+      }
+    }, 1000);
+  }, [projects]);
 
   const handleCreateProject = async (newProject: Omit<Project, 'teamId' | 'ownerId' | 'collaborators'>) => {
     if (!user || !team) return;
@@ -133,9 +158,36 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-paper dark:bg-sumi text-sumi dark:text-paper selection:bg-vermilion selection:text-white transition-colors duration-300">
+      {/* Save Status Indicator */}
+      {saveStatus !== 'idle' && (
+        <div className={`fixed top-6 right-6 z-50 flex items-center gap-2 px-4 py-2 rounded-full shadow-lg transition-all duration-300 ${
+          saveStatus === 'saving' ? 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400' :
+          saveStatus === 'saved' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' :
+          'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+        }`}>
+          {saveStatus === 'saving' && (
+            <>
+              <CloudUpload size={16} className="animate-pulse" />
+              <span className="text-sm font-medium">Saving...</span>
+            </>
+          )}
+          {saveStatus === 'saved' && (
+            <>
+              <Check size={16} />
+              <span className="text-sm font-medium">Saved</span>
+            </>
+          )}
+          {saveStatus === 'error' && (
+            <>
+              <span className="text-sm font-medium">Save failed</span>
+            </>
+          )}
+        </div>
+      )}
+
       {view === 'DASHBOARD' && (
-        <ProjectList 
-          projects={projects} 
+        <ProjectList
+          projects={projects}
           onSelectProject={handleSelectProject}
           onNewProject={() => setIsModalOpen(true)}
           onDeleteProject={handleDeleteProject}
@@ -143,8 +195,8 @@ const App: React.FC = () => {
       )}
 
       {view === 'PROJECT_DETAIL' && activeProject && (
-        <ProjectDetail 
-          project={activeProject} 
+        <ProjectDetail
+          project={activeProject}
           onBack={handleBack}
           onUpdateProject={handleUpdateProject}
         />
