@@ -66,7 +66,7 @@ const App: React.FC = () => {
 
   const handleCreateProject = async (newProject: Omit<Project, 'teamId' | 'ownerId' | 'collaborators'>) => {
     if (!user || !team) return;
-    
+
     // Attach metadata
     const projectWithMeta: Project = {
       ...newProject,
@@ -81,8 +81,18 @@ const App: React.FC = () => {
     setActiveProject(projectWithMeta);
     setView('PROJECT_DETAIL');
 
-    // Persist
-    await dbService.createProject(projectWithMeta);
+    // Persist and get the real project with proper UUID from database
+    try {
+      const savedProject = await dbService.createProject(projectWithMeta);
+      // Update with the real project from database (has proper UUID)
+      setProjects(prev => [savedProject, ...prev.filter(p => p.id !== projectWithMeta.id)]);
+      setActiveProject(savedProject);
+    } catch (error) {
+      console.error("Failed to create project:", error);
+      // Rollback optimistic update on error
+      setProjects(prev => prev.filter(p => p.id !== projectWithMeta.id));
+      alert("Failed to create project. Please try again.");
+    }
   };
 
   const handleDeleteProject = async (projectId: string) => {
