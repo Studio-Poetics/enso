@@ -58,21 +58,29 @@ const mapProjectFromDb = (project: any): Project => ({
   createdAt: new Date(project.created_at).getTime()
 });
 
-const mapProjectToDb = (project: Project) => ({
-  id: project.id,
-  team_id: project.teamId,
-  owner_id: project.ownerId,
-  title: project.title,
-  status: project.status,
-  content: {
-    client: project.client,
-    essence: project.essence,
-    layout: project.layout,
-    tasks: project.tasks,
-    boardItems: project.boardItems,
-    collaborators: project.collaborators
+const mapProjectToDb = (project: Project) => {
+  const dbProject: any = {
+    team_id: project.teamId,
+    owner_id: project.ownerId,
+    title: project.title,
+    status: project.status,
+    content: {
+      client: project.client,
+      essence: project.essence,
+      layout: project.layout,
+      tasks: project.tasks,
+      boardItems: project.boardItems,
+      collaborators: project.collaborators
+    }
+  };
+
+  // Only include id if it's a valid UUID (for updates, not inserts)
+  if (project.id && project.id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+    dbProject.id = project.id;
   }
-});
+
+  return dbProject;
+};
 
 // --- Auth Services ---
 
