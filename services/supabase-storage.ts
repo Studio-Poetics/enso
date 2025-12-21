@@ -518,14 +518,20 @@ export const dbService = {
   // --- Invitation System ---
 
   async inviteMemberNew(teamId: string, email: string, role: User['role'], invitedBy: string): Promise<Invitation> {
+    console.log('inviteMemberNew: Called with:', { teamId, email, role, invitedBy });
+
     // Check if user is already a team member
+    console.log('inviteMemberNew: Checking for existing profile...');
     const { data: existingProfile } = await supabase
       .from('profiles')
       .select('id')
       .eq('email', email)
       .single();
 
+    console.log('inviteMemberNew: Existing profile:', existingProfile);
+
     if (existingProfile) {
+      console.log('inviteMemberNew: Checking if already a team member...');
       const { data: existingMember } = await supabase
         .from('team_members')
         .select('*')
@@ -533,12 +539,16 @@ export const dbService = {
         .eq('user_id', existingProfile.id)
         .single();
 
+      console.log('inviteMemberNew: Existing member:', existingMember);
+
       if (existingMember) {
+        console.error('inviteMemberNew: User is already a member!');
         throw new Error("User is already a member of this team");
       }
     }
 
     // Check for existing pending invitation
+    console.log('inviteMemberNew: Checking for existing pending invitation...');
     const { data: existingInvite } = await supabase
       .from('invitations')
       .select('*')
@@ -547,11 +557,15 @@ export const dbService = {
       .eq('status', 'pending')
       .single();
 
+    console.log('inviteMemberNew: Existing invitation:', existingInvite);
+
     if (existingInvite) {
+      console.error('inviteMemberNew: Invitation already pending!');
       throw new Error("An invitation is already pending for this user");
     }
 
     // Create invitation
+    console.log('inviteMemberNew: Creating invitation...');
     const { data, error } = await supabase
       .from('invitations')
       .insert({
@@ -564,9 +578,11 @@ export const dbService = {
       .single();
 
     if (error) {
-      console.error('Failed to create invitation:', error);
+      console.error('inviteMemberNew: Failed to create invitation:', error);
       throw new Error(`Failed to create invitation: ${error.message}`);
     }
+
+    console.log('inviteMemberNew: Invitation created successfully:', data);
 
     return {
       id: data.id,
