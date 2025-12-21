@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { Team, User } from '../types';
+import React, { useState, useEffect } from 'react';
+import { Team, User, Invitation } from '../types';
 import { dbService } from '../services';
-import { X, UserPlus, Shield, Mail, Edit2, Check, Loader } from 'lucide-react';
+import { X, UserPlus, Shield, Mail, Edit2, Check, Loader, Clock, XCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 interface TeamManageModalProps {
@@ -12,35 +12,71 @@ interface TeamManageModalProps {
 
 const TeamManageModal: React.FC<TeamManageModalProps> = ({ team, currentUser, onClose }) => {
   const { refreshTeam } = useAuth();
-  
+
   // Invite State
   const [inviteEmail, setInviteEmail] = useState('');
   const [role, setRole] = useState<User['role']>('member');
   const [isInviting, setIsInviting] = useState(false);
   const [message, setMessage] = useState('');
 
+  // Pending Invitations State
+  const [pendingInvitations, setPendingInvitations] = useState<Invitation[]>([]);
+  const [isLoadingInvitations, setIsLoadingInvitations] = useState(false);
+
   // Team Edit State
   const [isEditingName, setIsEditingName] = useState(false);
   const [teamName, setTeamName] = useState(team.name);
   const [isSavingName, setIsSavingName] = useState(false);
 
+  // Load pending invitations
+  useEffect(() => {
+    loadPendingInvitations();
+  }, [team.id]);
+
+  const loadPendingInvitations = async () => {
+    setIsLoadingInvitations(true);
+    try {
+      const invitations = await dbService.getTeamInvitations(team.id);
+      setPendingInvitations(invitations);
+    } catch (error) {
+      console.error('Failed to load invitations:', error);
+    } finally {
+      setIsLoadingInvitations(false);
+    }
+  };
+
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inviteEmail) return;
-    
+
     setIsInviting(true);
     setMessage('');
 
     try {
-      await dbService.inviteMember(team.id, inviteEmail, role);
-      await refreshTeam();
-      setMessage(`Invited ${inviteEmail}`);
+      await dbService.inviteMemberNew(team.id, inviteEmail, role, currentUser.id);
+      await loadPendingInvitations();
+      setMessage(`✅ Invitation sent to ${inviteEmail}`);
       setInviteEmail('');
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      setMessage("Failed to invite.");
+      if (error.message.includes('already a member')) {
+        setMessage(`❌ ${inviteEmail} is already a team member`);
+      } else if (error.message.includes('already pending')) {
+        setMessage(`❌ An invitation is already pending for ${inviteEmail}`);
+      } else {
+        setMessage(`❌ Failed to send invitation: ${error.message}`);
+      }
     } finally {
       setIsInviting(false);
+    }
+  };
+
+  const handleCancelInvitation = async (invitationId: string) => {
+    try {
+      await dbService.cancelInvitation(invitationId);
+      await loadPendingInvitations();
+    } catch (error) {
+      console.error('Failed to cancel invitation:', error);
     }
   };
 
@@ -133,6 +169,42 @@ const TeamManageModal: React.FC<TeamManageModalProps> = ({ team, currentUser, on
               ))}
             </div>
           </div>
+
+          {/* Pending Invitations - Only visible to Owner/Admin */}
+          {isOwnerOrAdmin && pendingInvitations.length > 0 && (
+            <div className="space-y-4 pt-6 border-t border-gray-200 dark:border-gray-800">
+              <h3 className="text-xs uppercase tracking-widest text-gray-500 dark:text-gray-400 font-medium">
+                Pending Invitations ({pendingInvitations.length})
+              </h3>
+              <div className="space-y-3">
+                {pendingInvitations.map(invitation => (
+                  <div key={invitation.id} className="flex items-center justify-between p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 shadow-sm">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full bg-amber-200 dark:bg-amber-900/50 flex items-center justify-center">
+                        <Clock size={20} className="text-amber-600 dark:text-amber-500" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-sumi dark:text-paper">{invitation.email}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          Invited {new Date(invitation.createdAt).toLocaleDateString()} • Expires {new Date(invitation.expiresAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-mono uppercase tracking-wider text-gray-400 dark:text-gray-500">{invitation.role}</span>
+                      <button
+                        onClick={() => handleCancelInvitation(invitation.id)}
+                        className="text-gray-400 hover:text-vermilion transition-colors"
+                        title="Cancel invitation"
+                      >
+                        <XCircle size={18} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Invite Form - Only visible to Owner/Admin */}
           {isOwnerOrAdmin && (

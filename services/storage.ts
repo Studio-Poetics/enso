@@ -2,11 +2,15 @@
 import { Project, User, Team, ProjectStatus } from '../types';
 
 /**
- * STORAGE SERVICE
- * 
- * Currently implemented using LocalStorage for persistence on a single device.
- * To make this app "Real" for multi-device teams, replace the implementation
- * of these functions with calls to Supabase, Firebase, or your own API.
+ * STORAGE SERVICE - DEVELOPMENT ONLY
+ *
+ * ⚠️ WARNING: This is a DEVELOPMENT-ONLY implementation using localStorage.
+ * - NOT SECURE: Passwords are stored as base64 (easily reversible)
+ * - NOT SCALABLE: Data is only stored on a single device
+ * - NOT PRODUCTION-READY: No authentication, no authorization, no encryption
+ *
+ * For production, use the Supabase implementation (supabase-storage.ts)
+ * Set VITE_USE_SUPABASE=true in your .env file
  */
 
 const KEYS = {

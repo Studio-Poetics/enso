@@ -146,6 +146,25 @@ class GoogleDriveService {
     });
   }
 
+  async getUserEmail(): Promise<string> {
+    await this.initialize();
+    const authInstance = window.gapi.auth2.getAuthInstance();
+    if (!authInstance.isSignedIn.get()) {
+      throw new Error('Not signed in to Google Drive');
+    }
+    const profile = authInstance.currentUser.get().getBasicProfile();
+    return profile.getEmail();
+  }
+
+  async signOut(): Promise<void> {
+    await this.initialize();
+    const authInstance = window.gapi.auth2.getAuthInstance();
+    if (authInstance.isSignedIn.get()) {
+      await authInstance.signOut();
+    }
+    this.isInitialized = false;
+  }
+
   isAvailable(): boolean {
     return !!(this.config.apiKey && this.config.clientId && window.gapi);
   }
@@ -168,10 +187,15 @@ declare global {
             get: () => boolean;
           };
           signIn: () => Promise<any>;
+          signOut: () => Promise<void>;
           currentUser: {
             get: () => {
               getAuthResponse: () => {
                 access_token: string;
+              };
+              getBasicProfile: () => {
+                getEmail: () => string;
+                getName: () => string;
               };
             };
           };

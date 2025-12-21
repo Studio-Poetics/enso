@@ -15,7 +15,9 @@ const mapProfileToUser = (profile: any, role?: string): User => ({
   name: profile.name || profile.email?.split('@')[0] || 'Unknown',
   email: profile.email,
   avatar: profile.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name || 'U')}&background=1a1a1a&color=fff`,
-  role: role as User['role'] || 'member'
+  role: role as User['role'] || 'member',
+  googleDriveConnected: !!profile.google_drive_token,
+  googleDriveEmail: profile.google_drive_email
 });
 
 const mapTeamWithMembers = async (team: any): Promise<Team> => {
@@ -48,13 +50,14 @@ const mapProjectFromDb = (project: any): Project => ({
   ownerId: project.owner_id,
   title: project.title,
   status: project.status as ProjectStatus,
+  visibility: project.visibility || 'team', // NEW: visibility field
   // Extract fields from the JSONB content field
   client: project.content?.client || '',
   essence: project.content?.essence || '',
   layout: project.content?.layout || 'manuscript',
   tasks: project.content?.tasks || [],
   boardItems: project.content?.boardItems || [],
-  collaborators: project.content?.collaborators || [],
+  collaborators: project.content?.collaborators || [project.owner_id], // Ensure owner is in collaborators
   createdAt: new Date(project.created_at).getTime()
 });
 
@@ -64,6 +67,7 @@ const mapProjectToDb = (project: Project) => {
     owner_id: project.ownerId,
     title: project.title,
     status: project.status,
+    visibility: project.visibility, // NEW: visibility field
     content: {
       client: project.client,
       essence: project.essence,
@@ -296,21 +300,75 @@ export const authService = {
 // --- Data Services ---
 
 export const dbService = {
-  async getTeam(userId: string): Promise<Team | null> {
-    // Get the user's first team
-    const { data: teamMember, error: memberError } = await supabase
+  // NEW: Get all teams user belongs to (replaces getTeam)
+  async getUserTeams(userId: string): Promise<Team[]> {
+    const { data: teamMembers, error: memberError } = await supabase
       .from('team_members')
       .select(`
         team_id,
+        role,
         teams (id, name, owner_id)
       `)
       .eq('user_id', userId)
-      .limit(1)
+      .order('created_at', { ascending: true }); // First team created = default
+
+    if (memberError || !teamMembers) return [];
+
+    const teams = await Promise.all(
+      teamMembers.map(async (tm: any) => {
+        if (!tm.teams) return null;
+        return await mapTeamWithMembers(tm.teams);
+      })
+    );
+
+    return teams.filter((t): t is Team => t !== null);
+  },
+
+  // NEW: Get specific team by ID
+  async getTeamById(teamId: string): Promise<Team | null> {
+    const { data: team, error } = await supabase
+      .from('teams')
+      .select('*')
+      .eq('id', teamId)
       .single();
 
-    if (memberError || !teamMember?.teams) return null;
+    if (error || !team) return null;
+    return await mapTeamWithMembers(team);
+  },
 
-    return await mapTeamWithMembers(teamMember.teams);
+  // NEW: Get user's role in a specific team
+  async getUserRoleInTeam(userId: string, teamId: string): Promise<User['role']> {
+    const { data, error } = await supabase
+      .from('team_members')
+      .select('role')
+      .eq('user_id', userId)
+      .eq('team_id', teamId)
+      .single();
+
+    return data?.role || 'member';
+  },
+
+  // NEW: Get team members for collaborator selection
+  async getTeamMembersForCollaborators(teamId: string): Promise<User[]> {
+    const { data: teamMembers, error } = await supabase
+      .from('team_members')
+      .select(`
+        role,
+        profiles (id, name, email, avatar)
+      `)
+      .eq('team_id', teamId);
+
+    if (error) throw new Error("Failed to fetch team members");
+
+    return teamMembers?.map((tm: any) =>
+      mapProfileToUser(tm.profiles, tm.role)
+    ) || [];
+  },
+
+  // DEPRECATED: Use getUserTeams instead
+  async getTeam(userId: string): Promise<Team | null> {
+    const teams = await this.getUserTeams(userId);
+    return teams[0] || null;
   },
 
   async updateTeamName(teamId: string, name: string): Promise<Team> {
@@ -328,50 +386,51 @@ export const dbService = {
 
   async inviteMember(teamId: string, email: string, role: User['role']): Promise<User> {
     // Check if user already exists
-    let { data: existingProfile, error: profileError } = await supabase
+    const { data: existingProfile, error: profileError } = await supabase
       .from('profiles')
       .select('*')
       .eq('email', email)
       .single();
 
-    let userId: string;
+    console.log('inviteMember - profile lookup:', { email, existingProfile, profileError });
 
     if (profileError || !existingProfile) {
-      // Create a new user profile (they'll need to sign up later)
-      const { data: authUser, error: authError } = await supabase.auth.admin.inviteUserByEmail(email);
+      if (profileError) {
+        console.error('Profile lookup error:', profileError);
+      }
+      throw new Error("USER_NOT_FOUND");
+    }
 
-      if (authError) throw new Error("Failed to send invitation");
+    // Check if user is already a team member
+    const { data: existingMember, error: memberCheckError } = await supabase
+      .from('team_members')
+      .select('*')
+      .eq('team_id', teamId)
+      .eq('user_id', existingProfile.id)
+      .single();
 
-      userId = authUser.user.id;
+    console.log('inviteMember - member check:', { existingMember, memberCheckError });
 
-      // Create profile
-      const { data: newProfile, error: newProfileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: userId,
-          email: email,
-          name: email.split('@')[0]
-        })
-        .select()
-        .single();
-
-      if (newProfileError) throw new Error("Failed to create user profile");
-      existingProfile = newProfile;
-    } else {
-      userId = existingProfile.id;
+    if (existingMember) {
+      throw new Error("User is already a member of this team");
     }
 
     // Add user to team
-    const { error: memberError } = await supabase
+    const { data: insertedMember, error: memberError } = await supabase
       .from('team_members')
       .insert({
         team_id: teamId,
-        user_id: userId,
+        user_id: existingProfile.id,
         role: role
-      });
+      })
+      .select()
+      .single();
 
-    if (memberError && !memberError.message.includes('duplicate')) {
-      throw new Error("Failed to add user to team");
+    console.log('inviteMember - insert result:', { insertedMember, memberError });
+
+    if (memberError) {
+      console.error('Failed to add user to team:', memberError);
+      throw new Error(`Failed to add user to team: ${memberError.message}`);
     }
 
     return mapProfileToUser(existingProfile, role);
@@ -428,5 +487,227 @@ export const dbService = {
       .eq('id', projectId);
 
     if (error) throw new Error("Failed to delete project");
+  },
+
+  async saveGoogleDriveConnection(userId: string, googleDriveEmail: string): Promise<void> {
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        google_drive_token: 'CONNECTED', // We store the actual token in the browser's gapi session
+        google_drive_email: googleDriveEmail,
+        google_drive_connected_at: new Date().toISOString()
+      })
+      .eq('id', userId);
+
+    if (error) throw new Error("Failed to save Google Drive connection");
+  },
+
+  async removeGoogleDriveConnection(userId: string): Promise<void> {
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        google_drive_token: null,
+        google_drive_email: null,
+        google_drive_connected_at: null
+      })
+      .eq('id', userId);
+
+    if (error) throw new Error("Failed to remove Google Drive connection");
+  },
+
+  // --- Invitation System ---
+
+  async inviteMemberNew(teamId: string, email: string, role: User['role'], invitedBy: string): Promise<Invitation> {
+    // Check if user is already a team member
+    const { data: existingProfile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('email', email)
+      .single();
+
+    if (existingProfile) {
+      const { data: existingMember } = await supabase
+        .from('team_members')
+        .select('*')
+        .eq('team_id', teamId)
+        .eq('user_id', existingProfile.id)
+        .single();
+
+      if (existingMember) {
+        throw new Error("User is already a member of this team");
+      }
+    }
+
+    // Check for existing pending invitation
+    const { data: existingInvite } = await supabase
+      .from('invitations')
+      .select('*')
+      .eq('team_id', teamId)
+      .eq('email', email)
+      .eq('status', 'pending')
+      .single();
+
+    if (existingInvite) {
+      throw new Error("An invitation is already pending for this user");
+    }
+
+    // Create invitation
+    const { data, error } = await supabase
+      .from('invitations')
+      .insert({
+        team_id: teamId,
+        email: email,
+        role: role,
+        invited_by: invitedBy
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Failed to create invitation:', error);
+      throw new Error(`Failed to create invitation: ${error.message}`);
+    }
+
+    return {
+      id: data.id,
+      teamId: data.team_id,
+      email: data.email,
+      role: data.role,
+      invitedBy: data.invited_by,
+      status: data.status,
+      token: data.token,
+      createdAt: new Date(data.created_at).getTime(),
+      expiresAt: new Date(data.expires_at).getTime()
+    };
+  },
+
+  async getPendingInvitations(email: string): Promise<Invitation[]> {
+    console.log('getPendingInvitations: Fetching for email:', email);
+    const { data, error } = await supabase
+      .from('invitations')
+      .select(`
+        *,
+        teams (name),
+        profiles (name)
+      `)
+      .eq('email', email)
+      .eq('status', 'pending')
+      .gt('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('getPendingInvitations: Error fetching invitations:', error);
+      return [];
+    }
+
+    console.log('getPendingInvitations: Raw data:', data);
+
+    const invitations = data?.map((inv: any) => ({
+      id: inv.id,
+      teamId: inv.team_id,
+      teamName: inv.teams?.name,
+      email: inv.email,
+      role: inv.role,
+      invitedBy: inv.invited_by,
+      invitedByName: inv.profiles?.name,
+      status: inv.status,
+      token: inv.token,
+      createdAt: new Date(inv.created_at).getTime(),
+      expiresAt: new Date(inv.expires_at).getTime()
+    })) || [];
+
+    console.log('getPendingInvitations: Mapped invitations:', invitations);
+    return invitations;
+  },
+
+  async getTeamInvitations(teamId: string): Promise<Invitation[]> {
+    const { data, error } = await supabase
+      .from('invitations')
+      .select(`
+        *,
+        profiles (name)
+      `)
+      .eq('team_id', teamId)
+      .in('status', ['pending'])
+      .order('created_at', { ascending: false });
+
+    if (error) return [];
+
+    return data?.map((inv: any) => ({
+      id: inv.id,
+      teamId: inv.team_id,
+      email: inv.email,
+      role: inv.role,
+      invitedBy: inv.invited_by,
+      invitedByName: inv.profiles?.name,
+      status: inv.status,
+      token: inv.token,
+      createdAt: new Date(inv.created_at).getTime(),
+      expiresAt: new Date(inv.expires_at).getTime()
+    })) || [];
+  },
+
+  async acceptInvitation(invitationId: string, userId: string): Promise<void> {
+    // Get invitation details
+    const { data: invitation, error: invError } = await supabase
+      .from('invitations')
+      .select('*')
+      .eq('id', invitationId)
+      .single();
+
+    if (invError || !invitation) throw new Error("Invitation not found");
+
+    if (invitation.status !== 'pending') {
+      throw new Error("This invitation is no longer valid");
+    }
+
+    if (new Date(invitation.expires_at) < new Date()) {
+      throw new Error("This invitation has expired");
+    }
+
+    // Add user to team
+    const { error: memberError } = await supabase
+      .from('team_members')
+      .insert({
+        team_id: invitation.team_id,
+        user_id: userId,
+        role: invitation.role
+      });
+
+    if (memberError && !memberError.message.includes('duplicate')) {
+      throw new Error("Failed to add user to team");
+    }
+
+    // Update invitation status
+    const { error: updateError } = await supabase
+      .from('invitations')
+      .update({
+        status: 'accepted',
+        accepted_at: new Date().toISOString()
+      })
+      .eq('id', invitationId);
+
+    if (updateError) throw new Error("Failed to update invitation status");
+  },
+
+  async declineInvitation(invitationId: string): Promise<void> {
+    const { error } = await supabase
+      .from('invitations')
+      .update({
+        status: 'declined',
+        declined_at: new Date().toISOString()
+      })
+      .eq('id', invitationId);
+
+    if (error) throw new Error("Failed to decline invitation");
+  },
+
+  async cancelInvitation(invitationId: string): Promise<void> {
+    const { error } = await supabase
+      .from('invitations')
+      .update({ status: 'cancelled' })
+      .eq('id', invitationId);
+
+    if (error) throw new Error("Failed to cancel invitation");
   }
 };

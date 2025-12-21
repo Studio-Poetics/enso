@@ -1,7 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Project, Task, ProjectStatus, TaskStatus, BoardItem } from '../types';
-import { ArrowLeft, Sparkles, Coffee, Image as ImageIcon, Calendar, ChevronLeft, ChevronRight, X, Circle, CheckCircle, Eye, Wind, Loader, ChevronUp, ChevronDown, Lightbulb, GripVertical, Link as LinkIcon, Lock, GraduationCap, Layout, Grid, MoreHorizontal, Trash2 } from 'lucide-react';
+import { ArrowLeft, Sparkles, Coffee, Image as ImageIcon, Calendar, ChevronLeft, ChevronRight, X, Circle, CheckCircle, Eye, Wind, Loader, ChevronUp, ChevronDown, Lightbulb, GripVertical, Link as LinkIcon, Lock, GraduationCap, Layout, Grid, MoreHorizontal, Trash2, Users } from 'lucide-react';
 import { getUncleIrohWisdom, suggestTasks, getTaskMentorship, MentorshipResponse } from '../services/gemini';
+import { permissionService } from '../services/permissions';
+import { useAuth } from '../context/AuthContext';
+import CollaboratorPanel from './CollaboratorPanel';
 import MoodBoard from './MoodBoard';
 
 interface ProjectDetailProps {
@@ -18,6 +21,7 @@ interface ImageViewerState {
 type SubView = 'STUDIO' | 'COLLECTION';
 
 const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, onBack, onUpdateProject }) => {
+  const { user, activeTeam } = useAuth();
   const [subView, setSubView] = useState<SubView>('STUDIO');
   const [wisdom, setWisdom] = useState<string | null>(null);
   const [isLoadingWisdom, setIsLoadingWisdom] = useState(false);
@@ -25,9 +29,23 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, onBack, onUpdate
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [activeTaskCollectionId, setActiveTaskCollectionId] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  
+
   // Mentorship State
   const [mentorTask, setMentorTask] = useState<Task | null>(null);
+
+  // Calculate permissions
+  const permissions = activeTeam && user
+    ? permissionService.getProjectPermissions(project, user, activeTeam)
+    : null;
+
+  // Wrapped update function with permission check
+  const handleUpdate = (updated: Project) => {
+    if (!permissions?.canEdit) {
+      alert("You don't have permission to edit this project");
+      return;
+    }
+    onUpdateProject(updated);
+  };
 
   const askIroh = async () => {
     setIsLoadingWisdom(true);
@@ -48,7 +66,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, onBack, onUpdate
         dependencies: [],
         boardItems: []
      }));
-     onUpdateProject({ ...project, tasks: [...project.tasks, ...newTasks] });
+     handleUpdate({ ...project, tasks: [...project.tasks, ...newTasks] });
   };
 
   const addTask = (text: string, status: TaskStatus) => {
@@ -61,7 +79,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, onBack, onUpdate
       dependencies: [],
       boardItems: []
     };
-    onUpdateProject({ ...project, tasks: [...project.tasks, newTask] });
+    handleUpdate({ ...project, tasks: [...project.tasks, newTask] });
   };
 
   const addSubTasks = (parentTaskId: string, newTexts: string[]) => {
@@ -76,25 +94,29 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, onBack, onUpdate
       dependencies: [],
       boardItems: []
     }));
-    
+
     // Insert new tasks directly after the parent
     const updatedTasks = [...project.tasks];
     updatedTasks.splice(parentIndex + 1, 0, ...newTasks);
-    
-    onUpdateProject({ ...project, tasks: updatedTasks });
+
+    handleUpdate({ ...project, tasks: updatedTasks });
   };
 
   const updateTask = (taskId: string, updates: Partial<Task>) => {
-    const updatedTasks = project.tasks.map(t => 
+    const updatedTasks = project.tasks.map(t =>
       t.id === taskId ? { ...t, ...updates } : t
     );
-    onUpdateProject({ ...project, tasks: updatedTasks });
+    handleUpdate({ ...project, tasks: updatedTasks });
+  };
+
+  const saveMentorship = (taskId: string, mentorship: { advice: string; steps: string[]; generatedAt: number }) => {
+    updateTask(taskId, { mentorship });
   };
 
   const deleteTask = (taskId: string) => {
     if (window.confirm("Delete this step?")) {
         const updatedTasks = project.tasks.filter(t => t.id !== taskId);
-        onUpdateProject({ ...project, tasks: updatedTasks });
+        handleUpdate({ ...project, tasks: updatedTasks });
     }
   };
 
@@ -133,7 +155,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, onBack, onUpdate
     }
 
     newTasks.splice(targetIndex, 0, removed);
-    onUpdateProject({ ...project, tasks: newTasks });
+    handleUpdate({ ...project, tasks: newTasks });
     setDraggedTaskId(null);
   };
 
@@ -190,7 +212,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, onBack, onUpdate
       return (
         <MoodBoard 
           items={project.boardItems} 
-          onUpdateItems={(items) => onUpdateProject({ ...project, boardItems: items })}
+          onUpdateItems={(items) => handleUpdate({ ...project, boardItems: items })}
         />
       );
     }
@@ -237,7 +259,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, onBack, onUpdate
       
       {/* Mentorship Modal */}
       {mentorTask && (
-        <MentorshipModal 
+        <MentorshipModal
           task={mentorTask}
           essence={project.essence}
           onClose={() => setMentorTask(null)}
@@ -245,6 +267,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, onBack, onUpdate
             addSubTasks(mentorTask.id, steps);
             setMentorTask(null);
           }}
+          onSaveMentorship={saveMentorship}
         />
       )}
 
@@ -330,7 +353,34 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, onBack, onUpdate
 
         {/* Desktop Actions */}
         <div className="hidden md:flex flex-col items-end gap-2">
-          <button 
+          {/* Visibility Indicator */}
+          <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+            {project.visibility === 'private' ? (
+              <>
+                <Lock size={12} />
+                <span className="uppercase tracking-widest font-medium">Private</span>
+              </>
+            ) : (
+              <>
+                <Users size={12} />
+                <span className="uppercase tracking-widest font-medium">Team</span>
+              </>
+            )}
+          </div>
+
+          {/* Collaborator Panel */}
+          {permissions?.canManageCollaborators && activeTeam && (
+            <CollaboratorPanel
+              project={project}
+              team={activeTeam}
+              onUpdateCollaborators={(collabs) =>
+                handleUpdate({ ...project, collaborators: collabs })
+              }
+              canManage={true}
+            />
+          )}
+
+          <button
              onClick={askIroh}
              disabled={isLoadingWisdom}
              className="text-xs font-medium flex items-center gap-2 text-gray-500 dark:text-gray-400 hover:text-sumi dark:hover:text-paper transition-colors"
@@ -387,34 +437,52 @@ const MentorshipModal: React.FC<{
   essence: string;
   onClose: () => void;
   onAddSteps: (steps: string[]) => void;
-}> = ({ task, essence, onClose, onAddSteps }) => {
-  const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<MentorshipResponse | null>(null);
+  onSaveMentorship: (taskId: string, mentorship: { advice: string; steps: string[]; generatedAt: number }) => void;
+}> = ({ task, essence, onClose, onAddSteps, onSaveMentorship }) => {
+  const [loading, setLoading] = useState(!task.mentorship);
+  const [data, setData] = useState<MentorshipResponse | null>(
+    task.mentorship ? { advice: task.mentorship.advice, steps: task.mentorship.steps } : null
+  );
 
   useEffect(() => {
+    // If we already have mentorship saved, don't fetch again
+    if (task.mentorship) {
+      return;
+    }
+
     const fetchGuidance = async () => {
       const result = await getTaskMentorship(task.text, essence);
       setData(result);
       setLoading(false);
+
+      // Auto-save mentorship to task
+      onSaveMentorship(task.id, {
+        advice: result.advice,
+        steps: result.steps,
+        generatedAt: Date.now()
+      });
     };
     fetchGuidance();
-  }, [task, essence]);
+  }, [task, essence, onSaveMentorship]);
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-sumi/20 dark:bg-black/50 backdrop-blur-sm" onClick={onClose}>
-      <div 
-        className="bg-paper dark:bg-neutral-900 w-full max-w-md shadow-2xl border border-gray-200 dark:border-gray-700 animate-fade-in-up flex flex-col overflow-hidden"
+      <div
+        className="bg-paper dark:bg-neutral-900 w-full max-w-md max-h-[90vh] shadow-2xl border border-gray-200 dark:border-gray-700 animate-fade-in-up flex flex-col overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
-        <div className="p-6 bg-paper dark:bg-neutral-900 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
+        <div className="p-6 bg-paper dark:bg-neutral-900 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center flex-shrink-0">
           <div className="flex items-center gap-3 text-sumi dark:text-paper">
              <GraduationCap size={20} />
              <h3 className="font-serif text-lg">Mentor's Guidance</h3>
+             {task.mentorship && (
+               <span className="text-xs text-gray-500 dark:text-gray-400">(Saved)</span>
+             )}
           </div>
           <button onClick={onClose} className="text-gray-500 dark:text-gray-400 hover:text-sumi dark:hover:text-paper"><X size={20}/></button>
         </div>
-        
-        <div className="p-8">
+
+        <div className="p-8 overflow-y-auto flex-1">
            {loading ? (
              <div className="flex flex-col items-center justify-center py-8 gap-4 text-gray-500 dark:text-gray-400">
                <Loader size={24} className="animate-spin text-vermilion" />
@@ -428,7 +496,7 @@ const MentorshipModal: React.FC<{
                    "{data.advice}"
                  </p>
                </div>
-               
+
                <div>
                  <h4 className="text-xs font-sans uppercase tracking-widest text-gray-500 dark:text-gray-400 font-medium mb-3">Recommended Path</h4>
                  <ul className="space-y-3">
@@ -441,7 +509,7 @@ const MentorshipModal: React.FC<{
                  </ul>
                </div>
 
-               <button 
+               <button
                  onClick={() => onAddSteps(data.steps)}
                  className="w-full py-3 bg-sumi dark:bg-paper text-white dark:text-sumi hover:bg-vermilion dark:hover:bg-vermilion dark:hover:text-white transition-colors text-sm uppercase tracking-widest font-medium flex items-center justify-center gap-2"
                >

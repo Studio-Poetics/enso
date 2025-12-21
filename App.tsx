@@ -14,7 +14,7 @@ import { useTheme } from './context/ThemeContext';
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
 const App: React.FC = () => {
-  const { user, team, isLoading: isAuthLoading } = useAuth();
+  const { user, activeTeam, isLoading: isAuthLoading } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
   // Simple routing based on URL
@@ -34,10 +34,10 @@ const App: React.FC = () => {
   // Load Projects when User/Team changes
   useEffect(() => {
     const loadProjects = async () => {
-      if (team) {
+      if (activeTeam) {
         setIsDataLoading(true);
         try {
-          const data = await dbService.getProjects(team.id);
+          const data = await dbService.getProjects(activeTeam.id);
           setProjects(data);
         } catch (error) {
           console.error("Failed to load projects", error);
@@ -47,7 +47,7 @@ const App: React.FC = () => {
       }
     };
     loadProjects();
-  }, [team]);
+  }, [activeTeam]);
 
   const handleSelectProject = (project: Project) => {
     setActiveProject(project);
@@ -89,15 +89,15 @@ const App: React.FC = () => {
     }, 1000);
   }, [projects]);
 
-  const handleCreateProject = async (newProject: Omit<Project, 'teamId' | 'ownerId' | 'collaborators'>) => {
-    if (!user || !team) return;
+  const handleCreateProject = async (newProject: Omit<Project, 'teamId' | 'ownerId'>) => {
+    if (!user || !activeTeam) return;
 
     // Attach metadata
     const projectWithMeta: Project = {
       ...newProject,
-      teamId: team.id,
+      teamId: activeTeam.id,
       ownerId: user.id,
-      collaborators: [user.id]
+      // collaborators and visibility now come from newProject
     };
 
     // Optimistic Update
@@ -123,15 +123,17 @@ const App: React.FC = () => {
   const handleDeleteProject = async (projectId: string) => {
     // Optimistic Update
     setProjects(projects.filter(p => p.id !== projectId));
-    
+
     // Persist
     try {
       await dbService.deleteProject(projectId);
     } catch (error) {
       console.error("Failed to delete project", error);
       // Revert if failed (optional, but good practice)
-      const data = await dbService.getProjects(team!.id);
-      setProjects(data);
+      if (activeTeam) {
+        const data = await dbService.getProjects(activeTeam.id);
+        setProjects(data);
+      }
     }
   };
 

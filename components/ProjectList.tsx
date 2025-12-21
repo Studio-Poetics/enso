@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { Project, ProjectStatus } from '../types';
-import { Plus, ArrowRight, BookOpen, Users, LogOut, Trash2 } from 'lucide-react';
+import { Plus, ArrowRight, BookOpen, Users, LogOut, Trash2, Settings } from 'lucide-react';
 import PhilosophyGuide from './PhilosophyGuide';
 import TeamManageModal from './TeamManageModal';
+import TeamSwitcher from './TeamSwitcher';
+import UserSettingsModal from './UserSettingsModal';
+import InvitationNotifications from './InvitationNotifications';
 import { useAuth } from '../context/AuthContext';
 
 interface ProjectListProps {
@@ -13,9 +16,10 @@ interface ProjectListProps {
 }
 
 const ProjectList: React.FC<ProjectListProps> = ({ projects, onSelectProject, onNewProject, onDeleteProject }) => {
-  const { user, team, logout } = useAuth();
+  const { user, teams, activeTeam, switchTeam, logout, refreshUser } = useAuth();
   const [showPhilosophy, setShowPhilosophy] = useState(false);
   const [showTeamModal, setShowTeamModal] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   
   const getStatusColor = (status: ProjectStatus) => {
     switch(status) {
@@ -37,11 +41,18 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, onSelectProject, on
   return (
     <div className="w-full min-h-screen px-8 md:px-16 py-12 animate-fade-in relative flex flex-col transition-colors duration-300">
       {showPhilosophy && <PhilosophyGuide onClose={() => setShowPhilosophy(false)} />}
-      {showTeamModal && team && user && (
-        <TeamManageModal 
-          team={team} 
-          currentUser={user} 
-          onClose={() => setShowTeamModal(false)} 
+      {showTeamModal && activeTeam && user && (
+        <TeamManageModal
+          team={activeTeam}
+          currentUser={user}
+          onClose={() => setShowTeamModal(false)}
+        />
+      )}
+      {showSettings && user && (
+        <UserSettingsModal
+          user={user}
+          onClose={() => setShowSettings(false)}
+          onUpdate={refreshUser}
         />
       )}
 
@@ -53,16 +64,21 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, onSelectProject, on
           <div>
             <h1 className="text-5xl font-serif font-light text-sumi dark:text-paper tracking-tight mb-3">Enso</h1>
             <div className="flex items-center gap-4">
-               <a 
-                href="https://poetics.studio" 
-                target="_blank" 
-                rel="noopener noreferrer" 
+               <a
+                href="https://poetics.studio"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-xs text-gray-500 dark:text-gray-400 font-sans tracking-widest uppercase hover:text-vermilion transition-colors font-medium"
               >
                 Designed by Studio Poetics
               </a>
-              {team && (
-                <span className="text-xs text-gray-400 dark:text-gray-600 font-sans tracking-widest uppercase font-medium">| &nbsp; {team.name}</span>
+              {activeTeam && (
+                <>
+                  <span className="text-xs text-gray-400 dark:text-gray-600 font-sans tracking-widest uppercase font-medium">| &nbsp; {activeTeam.name}</span>
+                  {teams.length > 1 && (
+                    <TeamSwitcher teams={teams} activeTeam={activeTeam} onSwitch={switchTeam} />
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -81,7 +97,18 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, onSelectProject, on
              
              <div className="h-8 w-px bg-gray-200 dark:bg-gray-700 mx-2"></div>
 
-             <button 
+             <button
+               onClick={() => setShowSettings(true)}
+               className="text-gray-500 dark:text-gray-400 hover:text-sumi dark:hover:text-paper transition-colors flex items-center gap-2 group"
+               title="Settings"
+             >
+               <Settings size={18} className="group-hover:scale-110 transition-transform" />
+               <span className="font-sans text-xs uppercase tracking-widest font-medium">Settings</span>
+             </button>
+
+             <InvitationNotifications />
+
+             <button
                onClick={logout}
                className="text-gray-500 dark:text-gray-400 hover:text-vermilion transition-colors text-xs uppercase tracking-widest font-medium"
              >
@@ -91,7 +118,7 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, onSelectProject, on
 
           {/* Bottom: Action Buttons */}
           <div className="flex items-center gap-8">
-            <button 
+            <button
               onClick={() => setShowTeamModal(true)}
               className="text-gray-500 dark:text-gray-400 hover:text-sumi dark:hover:text-paper transition-colors flex items-center gap-2 group"
               title="Manage Team & Members"
@@ -137,9 +164,32 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, onSelectProject, on
               <h3 className="text-3xl font-serif text-sumi dark:text-paper mb-3 group-hover:translate-x-2 transition-transform duration-500 leading-tight">
                 {project.title}
               </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400 font-sans tracking-wide">{project.client}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400 font-sans tracking-wide mb-3">{project.client}</p>
+
+              {/* Collaborator Avatars */}
+              {project.collaborators && project.collaborators.length > 0 && (
+                <div className="flex -space-x-2 mt-3">
+                  {project.collaborators.slice(0, 3).map((collabId, idx) => {
+                    const collaborator = activeTeam?.members.find(m => m.id === collabId);
+                    return collaborator ? (
+                      <img
+                        key={idx}
+                        src={collaborator.avatar}
+                        alt={collaborator.name}
+                        className="w-6 h-6 rounded-full border-2 border-paper dark:border-sumi"
+                        title={collaborator.name}
+                      />
+                    ) : null;
+                  })}
+                  {project.collaborators.length > 3 && (
+                    <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700 border-2 border-paper dark:border-sumi flex items-center justify-center text-[10px] text-gray-600 dark:text-gray-400 font-medium">
+                      +{project.collaborators.length - 3}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-            
+
             <div className="opacity-0 group-hover:opacity-100 transition-all duration-500 flex items-center gap-3 text-vermilion translate-y-2 group-hover:translate-y-0">
               <span className="text-xs uppercase tracking-widest font-medium">Enter Project</span>
               <ArrowRight size={14} />
