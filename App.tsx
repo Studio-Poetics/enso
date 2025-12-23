@@ -31,22 +31,24 @@ const App: React.FC = () => {
 
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Load Projects when User/Team changes
-  useEffect(() => {
-    const loadProjects = async () => {
-      if (user) {
-        setIsDataLoading(true);
-        try {
-          // Fetch all projects from all teams the user belongs to
-          const data = await dbService.getAllUserProjects(user.id);
-          setProjects(data);
-        } catch (error) {
-          console.error("Failed to load projects", error);
-        } finally {
-          setIsDataLoading(false);
-        }
+  // Load Projects function
+  const loadProjects = async () => {
+    if (user) {
+      setIsDataLoading(true);
+      try {
+        // Fetch all projects from all teams the user belongs to
+        const data = await dbService.getAllUserProjects(user.id);
+        setProjects(data);
+      } catch (error) {
+        console.error("Failed to load projects", error);
+      } finally {
+        setIsDataLoading(false);
       }
-    };
+    }
+  };
+
+  // Load Projects when User changes
+  useEffect(() => {
     loadProjects();
   }, [user]);
 
@@ -194,6 +196,7 @@ const App: React.FC = () => {
           onSelectProject={handleSelectProject}
           onNewProject={() => setIsModalOpen(true)}
           onDeleteProject={handleDeleteProject}
+          onRefresh={loadProjects}
         />
       )}
 

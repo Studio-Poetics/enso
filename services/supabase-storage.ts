@@ -50,7 +50,8 @@ const mapProjectFromDb = (project: any): Project => ({
   ownerId: project.owner_id,
   title: project.title,
   status: project.status as ProjectStatus,
-  visibility: project.visibility || 'team', // NEW: visibility field
+  visibility: project.visibility || 'team',
+  pinned: project.pinned || false,
   // Extract fields from the JSONB content field
   client: project.content?.client || '',
   essence: project.content?.essence || '',
@@ -67,7 +68,8 @@ const mapProjectToDb = (project: Project) => {
     owner_id: project.ownerId,
     title: project.title,
     status: project.status,
-    visibility: project.visibility, // NEW: visibility field
+    visibility: project.visibility,
+    pinned: project.pinned,
     content: {
       client: project.client,
       essence: project.essence,
@@ -456,11 +458,31 @@ export const dbService = {
     const { data, error } = await supabase
       .from('projects')
       .select('*')
+      .order('pinned', { ascending: false })
       .order('created_at', { ascending: false });
 
     if (error) throw new Error("Failed to fetch projects");
 
     return data?.map(mapProjectFromDb) || [];
+  },
+
+  async toggleProjectPin(projectId: string): Promise<void> {
+    // Get current pinned status
+    const { data: project } = await supabase
+      .from('projects')
+      .select('pinned')
+      .eq('id', projectId)
+      .single();
+
+    if (!project) throw new Error("Project not found");
+
+    // Toggle the pinned status
+    const { error } = await supabase
+      .from('projects')
+      .update({ pinned: !project.pinned })
+      .eq('id', projectId);
+
+    if (error) throw new Error("Failed to toggle pin status");
   },
 
   async createProject(project: Project): Promise<Project> {

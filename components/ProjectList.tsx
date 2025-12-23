@@ -1,21 +1,23 @@
 import React, { useState } from 'react';
 import { Project, ProjectStatus } from '../types';
-import { Plus, ArrowRight, BookOpen, Users, LogOut, Trash2, Settings } from 'lucide-react';
+import { Plus, ArrowRight, BookOpen, Users, LogOut, Trash2, Settings, Pin, PinOff } from 'lucide-react';
 import PhilosophyGuide from './PhilosophyGuide';
 import TeamManageModal from './TeamManageModal';
 import TeamSwitcher from './TeamSwitcher';
 import UserSettingsModal from './UserSettingsModal';
 import InvitationNotifications from './InvitationNotifications';
 import { useAuth } from '../context/AuthContext';
+import { dbService } from '../services';
 
 interface ProjectListProps {
   projects: Project[];
   onSelectProject: (project: Project) => void;
   onNewProject: () => void;
   onDeleteProject: (projectId: string) => void;
+  onRefresh: () => void;
 }
 
-const ProjectList: React.FC<ProjectListProps> = ({ projects, onSelectProject, onNewProject, onDeleteProject }) => {
+const ProjectList: React.FC<ProjectListProps> = ({ projects, onSelectProject, onNewProject, onDeleteProject, onRefresh }) => {
   const { user, teams, activeTeam, switchTeam, logout, refreshUser } = useAuth();
   const [showPhilosophy, setShowPhilosophy] = useState(false);
   const [showTeamModal, setShowTeamModal] = useState(false);
@@ -35,6 +37,16 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, onSelectProject, on
     e.stopPropagation();
     if (window.confirm("Are you sure you want to delete this project? This action cannot be undone.")) {
       onDeleteProject(projectId);
+    }
+  };
+
+  const handleTogglePin = async (e: React.MouseEvent, projectId: string) => {
+    e.stopPropagation();
+    try {
+      await dbService.toggleProjectPin(projectId);
+      onRefresh();
+    } catch (error) {
+      console.error('Failed to toggle pin:', error);
     }
   };
 
@@ -157,9 +169,18 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, onSelectProject, on
             <div>
               <div className="flex justify-between items-start mb-6">
                 <span className="font-mono text-xs text-gray-400 dark:text-gray-600 group-hover:text-sumi dark:group-hover:text-paper transition-colors">0{project.id.slice(-2)}</span>
-                <span className={`font-mono text-xs uppercase tracking-widest font-medium ${getStatusColor(project.status)}`}>
-                  {project.status}
-                </span>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={(e) => handleTogglePin(e, project.id)}
+                    className={`transition-colors ${project.pinned ? 'text-vermilion' : 'text-gray-400 dark:text-gray-600 hover:text-vermilion dark:hover:text-vermilion'}`}
+                    title={project.pinned ? "Unpin project" : "Pin project to top"}
+                  >
+                    {project.pinned ? <Pin size={14} className="fill-current" /> : <PinOff size={14} />}
+                  </button>
+                  <span className={`font-mono text-xs uppercase tracking-widest font-medium ${getStatusColor(project.status)}`}>
+                    {project.status}
+                  </span>
+                </div>
               </div>
               <h3 className="text-3xl font-serif text-sumi dark:text-paper mb-3 group-hover:translate-x-2 transition-transform duration-500 leading-tight">
                 {project.title}

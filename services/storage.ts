@@ -199,9 +199,25 @@ export const dbService = {
     await delay(300);
     const projects = getStore<Project>(KEYS.PROJECTS);
     // Return all projects where user is owner or collaborator
-    return projects.filter(p =>
+    const userProjects = projects.filter(p =>
       p.ownerId === userId || p.collaborators.includes(userId)
     );
+    // Sort: pinned first, then by created date
+    return userProjects.sort((a, b) => {
+      if (a.pinned && !b.pinned) return -1;
+      if (!a.pinned && b.pinned) return 1;
+      return b.createdAt - a.createdAt;
+    });
+  },
+
+  async toggleProjectPin(projectId: string): Promise<void> {
+    await delay(100);
+    const projects = getStore<Project>(KEYS.PROJECTS);
+    const project = projects.find(p => p.id === projectId);
+    if (!project) throw new Error("Project not found");
+
+    project.pinned = !project.pinned;
+    setStore(KEYS.PROJECTS, projects);
   },
 
   async createProject(project: Project): Promise<Project> {

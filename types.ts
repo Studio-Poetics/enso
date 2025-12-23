@@ -87,6 +87,7 @@ export interface Project {
   ownerId: string; // Created by
   collaborators: string[]; // User IDs
   visibility: ProjectVisibility; // Project visibility: private or team-wide
+  pinned: boolean; // Whether project is pinned to top
   title: string;
   client: string;
   status: ProjectStatus;

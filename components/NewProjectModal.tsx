@@ -58,6 +58,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ onSave, onClose }) =>
       essence,
       layout,
       visibility,
+      pinned: false,
       collaborators: selectedCollaborators,
       tasks: [],
       boardItems: [],
