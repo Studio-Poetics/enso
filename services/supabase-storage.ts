@@ -437,15 +437,26 @@ export const dbService = {
   },
 
   async getProjects(teamId: string): Promise<Project[]> {
+    console.log('getProjects: Fetching for teamId:', teamId);
+
     const { data, error } = await supabase
       .from('projects')
       .select('*')
       .eq('team_id', teamId)
       .order('created_at', { ascending: false });
 
-    if (error) throw new Error("Failed to fetch projects");
+    if (error) {
+      console.error('getProjects: Error fetching projects:', error);
+      throw new Error("Failed to fetch projects");
+    }
 
-    return data?.map(mapProjectFromDb) || [];
+    console.log('getProjects: Raw data from database:', data);
+    console.log('getProjects: Number of projects returned:', data?.length || 0);
+
+    const projects = data?.map(mapProjectFromDb) || [];
+    console.log('getProjects: Mapped projects:', projects);
+
+    return projects;
   },
 
   async createProject(project: Project): Promise<Project> {

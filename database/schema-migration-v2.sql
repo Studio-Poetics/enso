@@ -8,12 +8,15 @@ ALTER TABLE projects ADD COLUMN IF NOT EXISTS visibility text CHECK (visibility 
 CREATE INDEX IF NOT EXISTS idx_projects_visibility ON projects(visibility);
 CREATE INDEX IF NOT EXISTS idx_projects_team_id ON projects(team_id);
 
--- Drop old RLS policies
+-- Drop ALL existing RLS policies on projects table
 DROP POLICY IF EXISTS "Team members can view projects" ON projects;
 DROP POLICY IF EXISTS "Project owners can update projects" ON projects;
 DROP POLICY IF EXISTS "Project owners can delete projects" ON projects;
 DROP POLICY IF EXISTS "Users can create own projects" ON projects;
 DROP POLICY IF EXISTS "Team members can create projects" ON projects;
+DROP POLICY IF EXISTS "Users can view accessible projects" ON projects;
+DROP POLICY IF EXISTS "Collaborators can update projects" ON projects;
+DROP POLICY IF EXISTS "Owners and admins can delete projects" ON projects;
 
 -- NEW: Project visibility policy
 -- Users can view projects if:
@@ -74,6 +77,9 @@ CREATE POLICY "Team members can create projects" ON projects
   );
 
 -- Add trigger to ensure owner is always in collaborators array
+DROP TRIGGER IF EXISTS project_collaborator_check ON projects;
+DROP FUNCTION IF EXISTS ensure_owner_in_collaborators();
+
 CREATE OR REPLACE FUNCTION ensure_owner_in_collaborators()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -98,7 +104,6 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create trigger for new projects and updates
-DROP TRIGGER IF EXISTS project_collaborator_check ON projects;
 CREATE TRIGGER project_collaborator_check
   BEFORE INSERT OR UPDATE ON projects
   FOR EACH ROW
