@@ -17,23 +17,18 @@ const InvitationNotifications: React.FC = () => {
   }, [user?.email]);
 
   const loadInvitations = async () => {
-    if (!user?.email) {
-      console.log('InvitationNotifications: No user email available');
-      return;
-    }
-    console.log('InvitationNotifications: Loading invitations for', user.email);
+    if (!user?.email) return;
+
     try {
       const invitations = await dbService.getPendingInvitations(user.email);
-      console.log('InvitationNotifications: Found invitations:', invitations);
       setPendingInvitations(invitations);
 
       // Auto-show modal if there are new invitations
       if (invitations.length > 0 && !showModal) {
-        console.log('InvitationNotifications: Auto-showing modal for', invitations.length, 'invitations');
         setShowModal(true);
       }
     } catch (error) {
-      console.error('InvitationNotifications: Failed to load invitations:', error);
+      console.error('Failed to load invitations:', error);
     }
   };
 
