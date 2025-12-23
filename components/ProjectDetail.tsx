@@ -164,7 +164,26 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, onBack, onUpdate
     if (!draggedTaskId) return;
 
     const task = project.tasks.find(t => t.id === draggedTaskId);
-    if (task && task.status !== status) {
+    if (!task) {
+      setDraggedTaskId(null);
+      return;
+    }
+
+    // Check dependencies before moving to 'review' or 'done'
+    if ((status === 'done' || status === 'review') && task.dependencies.length > 0) {
+      const unmetDeps = project.tasks.filter(t =>
+        task.dependencies.includes(t.id) && t.status !== 'done'
+      );
+
+      if (unmetDeps.length > 0) {
+        const depNames = unmetDeps.map(t => `"${t.text}"`).join(', ');
+        alert(`⚠️ This task depends on ${unmetDeps.length} incomplete task(s):\n\n${depNames}\n\nComplete dependencies first.`);
+        setDraggedTaskId(null);
+        return;
+      }
+    }
+
+    if (task.status !== status) {
       updateTask(task.id, { status });
     }
     setDraggedTaskId(null);
@@ -198,21 +217,23 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, onBack, onUpdate
         return null;
       }
       return (
-        <MoodBoard 
-          items={task.boardItems || []} 
+        <MoodBoard
+          items={task.boardItems || []}
           onUpdateItems={(items) => updateTask(task.id, { boardItems: items })}
           title={task.text}
           subtitle="Task Collection"
           onBack={() => setActiveTaskCollectionId(null)}
+          canEdit={permissions?.canEdit || false}
         />
       );
     }
 
     if (subView === 'COLLECTION') {
       return (
-        <MoodBoard 
-          items={project.boardItems} 
+        <MoodBoard
+          items={project.boardItems}
           onUpdateItems={(items) => handleUpdate({ ...project, boardItems: items })}
+          canEdit={permissions?.canEdit || false}
         />
       );
     }

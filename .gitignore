@@ -11,9 +11,11 @@ dist/
 dist-ssr/
 build/
 
-# Environment variables
+# Environment variables - NEVER commit these!
 .env
 .env.local
+.env.production
+.env.development
 .env.development.local
 .env.test.local
 .env.production.local

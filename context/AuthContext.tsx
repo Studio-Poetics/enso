@@ -29,17 +29,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
 
   const switchTeam = async (teamId: string) => {
+    if (!user) {
+      console.error('Cannot switch team: No user authenticated');
+      return;
+    }
+
     // Fetch fresh team data to avoid stale state
     const freshTeam = await dbService.getTeamById(teamId);
 
-    if (!freshTeam || !user) return;
+    if (!freshTeam) {
+      console.error('Cannot switch team: Team not found');
+      alert('Team not found. It may have been deleted.');
+      return;
+    }
 
-    // Get user's role in this specific team
+    // SECURITY: Verify user is actually a member of this team
     const role = await dbService.getUserRoleInTeam(user.id, teamId);
+
+    if (!role) {
+      console.error(`Authorization failed: User ${user.id} is not a member of team ${teamId}`);
+      alert('You do not have access to this team. Please contact the team owner for an invitation.');
+      return;
+    }
 
     // Update user with team-specific role
     setUser({ ...user, role });
     setActiveTeam(freshTeam);
+
+    // Update teams list if this team is not in the list
+    if (!teams.find(t => t.id === teamId)) {
+      setTeams([...teams, freshTeam]);
+    }
 
     // Persist active team to localStorage
     localStorage.setItem('activeTeamId', teamId);

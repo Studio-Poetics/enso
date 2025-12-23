@@ -724,66 +724,36 @@ export const dbService = {
   },
 
   async acceptInvitation(invitationId: string, userId: string): Promise<void> {
-    // Get invitation details
-    const { data: invitation, error: invError } = await supabase
-      .from('invitations')
-      .select('*')
-      .eq('id', invitationId)
-      .single();
+    // Use database function to handle invitation acceptance (bypasses RLS)
+    const { error } = await supabase.rpc('accept_invitation', {
+      p_invitation_id: invitationId,
+      p_user_id: userId
+    });
 
-    if (invError || !invitation) throw new Error("Invitation not found");
-
-    if (invitation.status !== 'pending') {
-      throw new Error("This invitation is no longer valid");
-    }
-
-    if (new Date(invitation.expires_at) < new Date()) {
-      throw new Error("This invitation has expired");
-    }
-
-    // Add user to team
-    const { error: memberError } = await supabase
-      .from('team_members')
-      .insert({
-        team_id: invitation.team_id,
-        user_id: userId,
-        role: invitation.role
-      });
-
-    if (memberError && !memberError.message.includes('duplicate')) {
-      throw new Error("Failed to add user to team");
-    }
-
-    // Update invitation status
-    const { error: updateError } = await supabase
-      .from('invitations')
-      .update({
-        status: 'accepted',
-        accepted_at: new Date().toISOString()
-      })
-      .eq('id', invitationId);
-
-    if (updateError) throw new Error("Failed to update invitation status");
+    if (error) throw new Error(error.message || "Failed to accept invitation");
   },
 
-  async declineInvitation(invitationId: string): Promise<void> {
-    const { error } = await supabase
-      .from('invitations')
-      .update({
-        status: 'declined',
-        declined_at: new Date().toISOString()
-      })
-      .eq('id', invitationId);
+  async declineInvitation(invitationId: string, userId: string): Promise<void> {
+    // Use database function to handle invitation decline (bypasses RLS)
+    const { error } = await supabase.rpc('decline_invitation', {
+      p_invitation_id: invitationId,
+      p_user_id: userId
+    });
 
-    if (error) throw new Error("Failed to decline invitation");
+    if (error) throw new Error(error.message || "Failed to decline invitation");
   },
 
   async cancelInvitation(invitationId: string): Promise<void> {
-    const { error } = await supabase
-      .from('invitations')
-      .update({ status: 'cancelled' })
-      .eq('id', invitationId);
+    // Get current user ID (temporary workaround - should be passed from caller)
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Not authenticated");
 
-    if (error) throw new Error("Failed to cancel invitation");
+    // Use database function to handle invitation cancellation (bypasses RLS)
+    const { error } = await supabase.rpc('cancel_invitation_rpc', {
+      p_invitation_id: invitationId,
+      p_user_id: user.id
+    });
+
+    if (error) throw new Error(error.message || "Failed to cancel invitation");
   }
 };

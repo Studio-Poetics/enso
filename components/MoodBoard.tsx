@@ -9,51 +9,91 @@ interface MoodBoardProps {
   title?: string;
   subtitle?: string;
   onBack?: () => void;
+  canEdit?: boolean; // SECURITY: Permission check for editing
 }
 
-const MoodBoard: React.FC<MoodBoardProps> = ({ items, onUpdateItems, title, subtitle, onBack }) => {
+const MoodBoard: React.FC<MoodBoardProps> = ({ items, onUpdateItems, title, subtitle, onBack, canEdit = true }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const addItem = (item: BoardItem) => {
+    // SECURITY: Check edit permission before adding items
+    if (!canEdit) {
+      alert("You don't have permission to add items to this collection");
+      return;
+    }
     onUpdateItems([item, ...items]);
     setIsMenuOpen(false);
   };
 
   const deleteItem = (id: string) => {
+    // SECURITY: Check edit permission before deleting
+    if (!canEdit) {
+      alert("You don't have permission to delete items from this collection");
+      return;
+    }
     onUpdateItems(items.filter(i => i.id !== id));
   };
 
   const updateItem = (id: string, updates: Partial<BoardItem>) => {
+    // SECURITY: Check edit permission before updating
+    if (!canEdit) {
+      alert("You don't have permission to edit items in this collection");
+      return;
+    }
     onUpdateItems(items.map(i => i.id === id ? { ...i, ...updates } : i));
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setIsUploading(true);
-      try {
-        const processedContent = await processFile(file);
-        addItem({
-          id: Date.now().toString(),
-          type: 'image',
-          content: processedContent,
-          marginalia: '',
-          createdAt: Date.now()
-        });
-      } catch (err) {
-        console.error("File processing failed", err);
-        alert("Could not process file. Please check your Google Drive permissions or try a smaller file.");
-      } finally {
-        setIsUploading(false);
-      }
+    if (!file) return;
+
+    // SECURITY: Check permission before uploading
+    if (!canEdit) {
+      alert("You don't have permission to upload files to this collection");
+      e.target.value = ''; // Reset file input
+      return;
+    }
+
+    // SECURITY: Validate file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'audio/mpeg', 'audio/wav', 'audio/webm'];
+    if (!allowedTypes.includes(file.type)) {
+      alert(`Invalid file type: ${file.type}\n\nAllowed types: JPEG, PNG, WebP, GIF, MP3, WAV, WebM`);
+      e.target.value = ''; // Reset file input
+      return;
+    }
+
+    // SECURITY: Check file size (max 10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      alert(`File too large: ${(file.size / 1024 / 1024).toFixed(2)}MB\n\nMaximum size: 10MB`);
+      e.target.value = ''; // Reset file input
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const processedContent = await processFile(file);
+      addItem({
+        id: crypto.randomUUID(), // SECURITY: Use cryptographically secure UUID
+        type: file.type.startsWith('audio/') ? 'audio' : 'image',
+        content: processedContent,
+        marginalia: '',
+        createdAt: Date.now()
+      });
+    } catch (err) {
+      console.error("File processing failed", err);
+      alert("Could not process file. Please check your Google Drive permissions or try a smaller file.");
+    } finally {
+      setIsUploading(false);
+      e.target.value = ''; // Reset file input
     }
   };
 
   const handleAddText = () => {
     addItem({
-      id: Date.now().toString(),
+      id: crypto.randomUUID(), // SECURITY: Use cryptographically secure UUID
       type: 'text',
       content: '',
       marginalia: '',
@@ -64,14 +104,20 @@ const MoodBoard: React.FC<MoodBoardProps> = ({ items, onUpdateItems, title, subt
   const handleAddLink = () => {
     const url = prompt("Enter URL:");
     if (url) {
-       addItem({
-        id: Date.now().toString(),
-        type: 'link',
-        content: url,
-        meta: new URL(url).hostname,
-        marginalia: '',
-        createdAt: Date.now()
-      });
+      try {
+        // Validate URL format
+        new URL(url);
+        addItem({
+          id: crypto.randomUUID(), // SECURITY: Use cryptographically secure UUID
+          type: 'link',
+          content: url,
+          meta: new URL(url).hostname,
+          marginalia: '',
+          createdAt: Date.now()
+        });
+      } catch (error) {
+        alert("Invalid URL format. Please enter a valid URL (e.g., https://example.com)");
+      }
     }
   };
 

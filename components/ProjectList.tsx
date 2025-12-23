@@ -3,7 +3,6 @@ import { Project, ProjectStatus } from '../types';
 import { Plus, ArrowRight, BookOpen, Users, LogOut, Trash2, Settings, Pin, PinOff } from 'lucide-react';
 import PhilosophyGuide from './PhilosophyGuide';
 import TeamManageModal from './TeamManageModal';
-import TeamSwitcher from './TeamSwitcher';
 import UserSettingsModal from './UserSettingsModal';
 import InvitationNotifications from './InvitationNotifications';
 import { useAuth } from '../context/AuthContext';
@@ -18,7 +17,7 @@ interface ProjectListProps {
 }
 
 const ProjectList: React.FC<ProjectListProps> = ({ projects, onSelectProject, onNewProject, onDeleteProject, onRefresh }) => {
-  const { user, teams, activeTeam, switchTeam, logout, refreshUser } = useAuth();
+  const { user, teams, activeTeam, logout, refreshUser } = useAuth();
   const [showPhilosophy, setShowPhilosophy] = useState(false);
   const [showTeamModal, setShowTeamModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -85,12 +84,7 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, onSelectProject, on
                 Designed by Studio Poetics
               </a>
               {activeTeam && (
-                <>
-                  <span className="text-xs text-gray-400 dark:text-gray-600 font-sans tracking-widest uppercase font-medium">| &nbsp; {activeTeam.name}</span>
-                  {teams.length > 1 && (
-                    <TeamSwitcher teams={teams} activeTeam={activeTeam} onSwitch={switchTeam} />
-                  )}
-                </>
+                <span className="text-xs text-gray-400 dark:text-gray-600 font-sans tracking-widest uppercase font-medium">| &nbsp; {activeTeam.name}</span>
               )}
             </div>
           </div>

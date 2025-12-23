@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Project, ProjectStatus, ProjectLayout, ProjectVisibility, User } from '../types';
 import { generateProjectEssence } from '../services/gemini';
-import { X, Sparkles, ArrowRight, LayoutList, Kanban as KanbanIcon, Lock, Users as UsersIcon } from 'lucide-react';
+import { X, Sparkles, ArrowRight, LayoutList, Kanban as KanbanIcon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { dbService } from '../services';
 
@@ -18,7 +18,6 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ onSave, onClose }) =>
   const [notes, setNotes] = useState('');
   const [essence, setEssence] = useState('');
   const [layout, setLayout] = useState<ProjectLayout>('manuscript');
-  const [visibility, setVisibility] = useState<ProjectVisibility>('team');
   const [selectedCollaborators, setSelectedCollaborators] = useState<string[]>([]);
   const [teamMembers, setTeamMembers] = useState<User[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -57,7 +56,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ onSave, onClose }) =>
       status: ProjectStatus.IDEA,
       essence,
       layout,
-      visibility,
+      visibility: 'private', // Always private - access controlled by collaborators only
       pinned: false,
       collaborators: selectedCollaborators,
       tasks: [],
@@ -203,7 +202,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ onSave, onClose }) =>
                 onClick={() => setStep(4)}
                 className="bg-sumi dark:bg-paper text-white dark:text-sumi px-8 py-3 flex items-center gap-3 hover:bg-vermilion dark:hover:bg-vermilion dark:hover:text-white transition-colors duration-300 shadow-lg"
               >
-                <span className="uppercase tracking-widest text-sm font-medium">Next: Access</span>
+                <span className="uppercase tracking-widest text-sm font-medium">Next: Collaborators</span>
                 <ArrowRight size={16} />
               </button>
              </div>
@@ -212,49 +211,8 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ onSave, onClose }) =>
 
         {step === 4 && (
           <div className="space-y-8">
-            <h2 className="text-3xl font-serif text-sumi dark:text-paper">Access & Collaboration</h2>
-            <p className="text-gray-600 dark:text-gray-400">Control who can see and work on this project.</p>
-
-            {/* Visibility Toggle */}
-            <div>
-              <label className="text-xs uppercase tracking-widest text-gray-500 dark:text-gray-400 font-medium mb-4 block">
-                Project Visibility
-              </label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <button
-                  onClick={() => setVisibility('team')}
-                  className={`p-6 border text-left transition-all ${
-                    visibility === 'team'
-                      ? 'border-sumi dark:border-paper bg-white dark:bg-neutral-800'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 mb-2 text-sumi dark:text-paper">
-                    <UsersIcon size={20} />
-                    <span className="font-medium">Team-Wide</span>
-                  </div>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
-                    All team members can see this project. Only collaborators can edit.
-                  </p>
-                </button>
-                <button
-                  onClick={() => setVisibility('private')}
-                  className={`p-6 border text-left transition-all ${
-                    visibility === 'private'
-                      ? 'border-sumi dark:border-paper bg-white dark:bg-neutral-800'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 mb-2 text-sumi dark:text-paper">
-                    <Lock size={20} />
-                    <span className="font-medium">Private</span>
-                  </div>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
-                    Only you and selected collaborators can access this project.
-                  </p>
-                </button>
-              </div>
-            </div>
+            <h2 className="text-3xl font-serif text-sumi dark:text-paper">Choose Collaborators</h2>
+            <p className="text-gray-600 dark:text-gray-400">Select team members who can view and edit this project.</p>
 
             {/* Collaborator Selection */}
             <div>

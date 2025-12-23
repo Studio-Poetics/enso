@@ -61,15 +61,18 @@ class GoogleDriveService {
     return authInstance.isSignedIn.get();
   }
 
-  async uploadFile(file: File, filename?: string): Promise<DriveFile> {
+  async uploadFile(file: File, filename?: string, folderId?: string): Promise<DriveFile> {
     const isAuthenticated = await this.authenticate();
     if (!isAuthenticated) {
       throw new Error('Google Drive authentication required');
     }
 
+    // Use specified folder or default app folder
+    const targetFolder = folderId || import.meta.env.VITE_GOOGLE_DRIVE_FOLDER_ID;
+
     const metadata = {
       name: filename || file.name,
-      parents: ['appDataFolder'] // Store in app-specific folder
+      ...(targetFolder && { parents: [targetFolder] })
     };
 
     const form = new FormData();
@@ -90,10 +93,10 @@ class GoogleDriveService {
 
     const result = await response.json();
 
-    // Make file publicly readable
-    await this.setFilePermissions(result.id);
+    // SECURITY: Files are now private by default (not publicly accessible)
+    // Only the authenticated user can access these files
+    // To share with team members, use shareFileWithUsers() method
 
-    // Get the public link
     return await this.getFileInfo(result.id);
   }
 
@@ -111,14 +114,42 @@ class GoogleDriveService {
     return this.uploadFile(file, filename);
   }
 
-  private async setFilePermissions(fileId: string): Promise<void> {
+  /**
+   * Share a file with specific users (by email)
+   * SECURITY: Only share with authorized team members, never use type: 'anyone'
+   */
+  async shareFileWithUsers(fileId: string, emailAddresses: string[]): Promise<void> {
+    const isAuthenticated = await this.authenticate();
+    if (!isAuthenticated) {
+      throw new Error('Google Drive authentication required');
+    }
+
+    // Share with each user individually
+    for (const email of emailAddresses) {
+      await window.gapi.client.request({
+        path: `https://www.googleapis.com/drive/v3/files/${fileId}/permissions`,
+        method: 'POST',
+        body: JSON.stringify({
+          role: 'reader',
+          type: 'user',
+          emailAddress: email
+        })
+      });
+    }
+  }
+
+  /**
+   * Remove access for a specific user
+   */
+  async revokeFileAccess(fileId: string, permissionId: string): Promise<void> {
+    const isAuthenticated = await this.authenticate();
+    if (!isAuthenticated) {
+      throw new Error('Google Drive authentication required');
+    }
+
     await window.gapi.client.request({
-      path: `https://www.googleapis.com/drive/v3/files/${fileId}/permissions`,
-      method: 'POST',
-      body: JSON.stringify({
-        role: 'reader',
-        type: 'anyone'
-      })
+      path: `https://www.googleapis.com/drive/v3/files/${fileId}/permissions/${permissionId}`,
+      method: 'DELETE'
     });
   }
 

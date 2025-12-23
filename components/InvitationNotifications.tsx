@@ -53,9 +53,10 @@ const InvitationNotifications: React.FC = () => {
   };
 
   const handleDecline = async (invitation: Invitation) => {
+    if (!user) return;
     setProcessing(invitation.id);
     try {
-      await dbService.declineInvitation(invitation.id);
+      await dbService.declineInvitation(invitation.id, user.id);
       await loadInvitations();
     } catch (error: any) {
       console.error('Failed to decline invitation:', error);
