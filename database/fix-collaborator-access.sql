@@ -2,8 +2,9 @@
 -- Only users in the collaborators array should see projects
 -- Removing someone from collaborators immediately revokes their access
 
--- Drop existing policy
+-- Drop all existing view policies
 DROP POLICY IF EXISTS "Users can view accessible projects" ON projects;
+DROP POLICY IF EXISTS "Only collaborators can view projects" ON projects;
 
 -- NEW: Simplified policy - only collaborators can view
 -- Users can view a project if:
