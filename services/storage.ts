@@ -195,6 +195,15 @@ export const dbService = {
     return projects.filter(p => p.teamId === teamId);
   },
 
+  async getAllUserProjects(userId: string): Promise<Project[]> {
+    await delay(300);
+    const projects = getStore<Project>(KEYS.PROJECTS);
+    // Return all projects where user is owner or collaborator
+    return projects.filter(p =>
+      p.ownerId === userId || p.collaborators.includes(userId)
+    );
+  },
+
   async createProject(project: Project): Promise<Project> {
     const projects = getStore<Project>(KEYS.PROJECTS);
     projects.unshift(project);

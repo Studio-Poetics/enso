@@ -459,6 +459,32 @@ export const dbService = {
     return projects;
   },
 
+  async getAllUserProjects(userId: string): Promise<Project[]> {
+    console.log('getAllUserProjects: Fetching all projects for user:', userId);
+
+    // Fetch projects from all teams the user belongs to
+    // The RLS policies will automatically filter to show only:
+    // 1. Team-wide projects from teams they're members of
+    // 2. Private projects where they're collaborators
+    const { data, error } = await supabase
+      .from('projects')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('getAllUserProjects: Error fetching projects:', error);
+      throw new Error("Failed to fetch projects");
+    }
+
+    console.log('getAllUserProjects: Raw data from database:', data);
+    console.log('getAllUserProjects: Number of projects returned:', data?.length || 0);
+
+    const projects = data?.map(mapProjectFromDb) || [];
+    console.log('getAllUserProjects: Mapped projects:', projects);
+
+    return projects;
+  },
+
   async createProject(project: Project): Promise<Project> {
     const dbProject = mapProjectToDb(project);
 

@@ -34,10 +34,11 @@ const App: React.FC = () => {
   // Load Projects when User/Team changes
   useEffect(() => {
     const loadProjects = async () => {
-      if (activeTeam) {
+      if (user) {
         setIsDataLoading(true);
         try {
-          const data = await dbService.getProjects(activeTeam.id);
+          // Fetch all projects from all teams the user belongs to
+          const data = await dbService.getAllUserProjects(user.id);
           setProjects(data);
         } catch (error) {
           console.error("Failed to load projects", error);
@@ -47,7 +48,7 @@ const App: React.FC = () => {
       }
     };
     loadProjects();
-  }, [activeTeam]);
+  }, [user]);
 
   const handleSelectProject = (project: Project) => {
     setActiveProject(project);
