@@ -386,6 +386,55 @@ export const dbService = {
     return await mapTeamWithMembers(data);
   },
 
+  async updateMemberRole(teamId: string, userId: string, memberId: string, newRole: 'admin' | 'member' | 'viewer'): Promise<void> {
+    const { error } = await supabase.rpc('update_team_member_role', {
+      p_team_id: teamId,
+      p_user_id: userId,
+      p_member_id: memberId,
+      p_new_role: newRole
+    });
+
+    if (error) throw new Error(error.message || "Failed to update member role");
+  },
+
+  async removeMember(teamId: string, userId: string, memberToRemove: string): Promise<void> {
+    const { error } = await supabase.rpc('remove_team_member', {
+      p_team_id: teamId,
+      p_user_id: userId,
+      p_member_to_remove: memberToRemove
+    });
+
+    if (error) throw new Error(error.message || "Failed to remove member");
+  },
+
+  async transferOwnership(teamId: string, currentOwnerId: string, newOwnerId: string): Promise<void> {
+    const { error } = await supabase.rpc('transfer_team_ownership', {
+      p_team_id: teamId,
+      p_current_owner_id: currentOwnerId,
+      p_new_owner_id: newOwnerId
+    });
+
+    if (error) throw new Error(error.message || "Failed to transfer ownership");
+  },
+
+  async deleteTeam(teamId: string, userId: string): Promise<void> {
+    const { error } = await supabase.rpc('soft_delete_team', {
+      p_team_id: teamId,
+      p_user_id: userId
+    });
+
+    if (error) throw new Error(error.message || "Failed to delete team");
+  },
+
+  async restoreTeam(teamId: string, userId: string): Promise<void> {
+    const { error } = await supabase.rpc('restore_deleted_team', {
+      p_team_id: teamId,
+      p_user_id: userId
+    });
+
+    if (error) throw new Error(error.message || "Failed to restore team");
+  },
+
   async inviteMember(teamId: string, email: string, role: User['role']): Promise<User> {
     // Check if user already exists
     const { data: existingProfile, error: profileError } = await supabase
